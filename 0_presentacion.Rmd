@@ -1,0 +1,88 @@
+---
+title: "CustomerLens-Analytics. Grupo 2."
+author: "Jaime Linares Barrera, Andrés Martínez Reviriego, Pablo Oliva Muñoz y Francisco Javier Ruiz Rodríguez "
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    # number_sections: true
+---
+
+# CustomerLens-Analytics
+
+## Introducción
+
+En un contexto empresarial cada vez más orientado a los datos, comprender en profundidad el comportamiento del cliente se ha convertido en un factor clave para la toma de decisiones estratégicas. Las compañías no solo necesitan saber qué compran sus clientes, sino también por qué lo hacen, cómo interactúan con los distintos canales y qué perfiles generan mayor valor a largo plazo. En este sentido, el análisis de datos de clientes permite transformar información histórica en conocimiento accionable.
+
+El presente proyecto, **CustomerLens-Analytics**, tiene como objetivo analizar el comportamiento de consumo de clientes a partir de un conjunto de datos, con el fin de identificar patrones, relaciones entre variables y diferencias significativas entre distintos perfiles de clientes. A través de técnicas de ciencia de datos, se pretende obtener una visión global que ayude a entender mejor la relación entre características sociodemográficas, hábitos de compra, respuesta a campañas y rentabilidad.
+
+Este estudio se centra especialmente en responder una serie de preguntas clave desde una perspectiva analítica. Estas son algunas de ellas:
+
+-   ¿Hay relación entre la estructura familiar del cliente y su patrón de consumo?
+-   ¿Influye el nivel de ingresos en la diversidad y/o cantidad de productos comprados?
+-   ¿Existe relación entre el canal de compra y la presentación de quejas por parte del cliente?
+-   ¿Son los clientes que compran con descuentos realmente rentables a largo plazo o estamos subvencionando a clientes de bajo valor?
+-   ¿Depende el volumen total de pedidos de la diversidad de canales utilizados o compran más aquellos clientes que concentran su actividad en un único canal?
+
+Responder a estas cuestiones permitirá no solo describir el comportamiento del cliente, sino también sentar las bases para una posible segmentación, optimización de campañas y mejora de la rentabilidad.
+
+A lo largo de los distintos notebooks que componen este trabajo se realizará un estudio para tratar de dar respuesta a cada una de las preguntas del dataset. En este primer notebook, el foco estará exclusivamente en presentar el conjunto de datos y entender su estructura.
+
+Para llevar a cabo este estudio se ha utilizado un conjunto de datos disponible en la plataforma [Kaggle](https://www.kaggle.com/), accesible a través del siguiente enlace: <https://www.kaggle.com/datasets/imakash3011/customer-personality-analysis>
+
+## Presentación del dataset
+
+En este notebook nos centraremos únicamente en la carga y descripción inicial del dataset, sin realizar todavía ningún tipo de visualización ni análisis en profundidad. Esta fase es fundamental para familiarizarnos con los datos, comprender qué información tenemos disponible y evaluar su calidad antes de avanzar hacia etapas posteriores del proyecto.
+
+El dataset contiene información relacionada con características de los clientes, su estructura familiar, hábitos de compra, canales utilizados, respuesta a campañas de marketing y otros indicadores relevantes para el análisis del comportamiento y la rentabilidad del cliente.
+
+Antes de comenzar con cualquier análisis, vamos a importar las librerías necesarias y cargar los datos.
+
+### 1. Cargamos la librerías necesarias
+
+```{r}
+library(dplyr)
+library(readr)
+```
+
+### 2. Lectura del dataset
+
+Leemos el archivo CSV correspondiente al dataset Customer Personality Analysis, que se encuentra almacenado en la carpeta data del proyecto.
+
+```{r}
+data <- read_delim("./data/marketing_campaign.csv", delim = "\t")
+head(data)
+```
+
+Visualizamos las primeras filas del conjunto de datos para obtener una idea preliminar de su contenido y formato.
+
+### 3. Estructura del conjunto de datos
+
+A continuación, analizamos la estructura interna del dataset para conocer el número de observaciones, las variables disponibles y el tipo de dato de cada una de ellas.
+
+```{r}
+str(data)
+```
+
+Este paso nos permite identificar variables numéricas, categóricas y posibles variables que requieran transformaciones en etapas posteriores.
+
+### 4. Resumen estadístico
+
+Obtenemos un resumen general de las variables del dataset, incluyendo medidas descriptivas básicas como mínimos, máximos, medias y frecuencias, según corresponda.
+
+```{r}
+summary(data)
+```
+
+Este resumen ofrece una primera aproximación a la distribución de los datos y puede ayudar a detectar valores atípicos o rangos inesperados.
+
+### 5. Valores faltantes
+
+Finalmente, comprobamos si existen valores faltantes en alguna de las variables del conjunto de datos, lo cual será relevante para los procesos de limpieza y preprocesamiento posteriores.
+
+```{r}
+colSums(is.na(data))
+```
+
+La identificación temprana de valores ausentes permitirá decidir, en siguientes notebooks, la estrategia más adecuada para su tratamiento.
