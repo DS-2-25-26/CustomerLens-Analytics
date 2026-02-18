@@ -19,11 +19,14 @@ El presente proyecto, **CustomerLens-Analytics**, tiene como objetivo analizar e
 
 Este estudio se centra especialmente en responder una serie de preguntas clave desde una perspectiva analítica. Estas son algunas de ellas:
 
--   ¿Hay relación entre la estructura familiar del cliente y su patrón de consumo?
--   ¿Influye el nivel de ingresos en la diversidad y/o cantidad de productos comprados?
--   ¿Existe relación entre el canal de compra y la presentación de quejas por parte del cliente?
--   ¿Son los clientes que compran con descuentos realmente rentables a largo plazo o estamos subvencionando a clientes de bajo valor?
--   ¿Depende el volumen total de pedidos de la diversidad de canales utilizados o compran más aquellos clientes que concentran su actividad en un único canal?
+- ¿Hay relación entre la estructura familiar del cliente y su patrón de consumo?
+- ¿El nivel de ingresos influye en la diversidad y/o cantidad de productos comprados?
+- ¿Existe relación entre la edad del cliente y el tipo de producto que consume?
+- ¿Existe relación entre el canal de compras y la presentación de quejas por parte del cliente?
+- ¿Hay relación entre el nivel educativo del cliente y su respuesta a las campañas?
+- ¿Son los clientes que compran con descuentos realmente rentables a largo plazo, o estamos "subvencionando" a clientes de bajo valor?
+- ¿Aumenta el volumen de compras de forma significativa cuantos más canales utiliza el cliente?
+- ¿Cuáles son las características más frecuentes de los clientes que presentan quejas?
 
 Responder a estas cuestiones permitirá no solo describir el comportamiento del cliente, sino también sentar las bases para una posible segmentación, optimización de campañas y mejora de la rentabilidad.
 
