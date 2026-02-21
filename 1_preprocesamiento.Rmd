@@ -1,0 +1,542 @@
+---
+title: "CustomerLens-Analytics. Grupo 2."
+author: "Jaime Linares Barrera, Andrés Martínez Reviriego, Pablo Oliva Muñoz y Francisco Javier Ruiz Rodríguez "
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    # number_sections: true
+---
+
+# Preprocesamiento
+
+En este notebook realizamos la **carga, limpieza y preprocesamiento** del dataset *Customer Personality Analysis* para dejar un dataset consistente y listo para los siguientes notebooks de análisis.
+
+Se documentan explícitamente:
+
+-   Tamaño del fichero, nº filas/columnas y tipos.
+-   Valores faltantes y duplicados.
+-   Transformaciones realizadas (tipos, categorías, variables derivadas).
+-   Criterios de depuración (por ejemplo, ingresos inválidos o extremos).
+
+*(Este enfoque responde a los criterios de la rúbrica relativos a importación/limpieza/tratamiento y calidad formal del documento).*
+
+A continuación importamos las librerías necesarias.
+
+```{r}
+library(dplyr)
+library(readr)
+library(stringr)
+library(lubridate)
+```
+
+## 1. Lectura del dataset y primer vistazo al conjunto de datos
+
+### 1.1. Tamaño del fichero y carga
+
+Vemos el tamaño y leemos el archivo CSV correspondiente al dataset *Customer Personality Analysis*, que se encuentra almacenado en la carpeta `data` del proyecto.
+
+```{r}
+file_path <- "./data/marketing_campaign.csv"
+
+file_size_bytes <- file.info(file_path)$size
+file_size_mb <- file_size_bytes / (1024^2)
+file_size_mb
+```
+
+Como podemos ver el archivo ocupa aproximadamente **0.21 MB**.
+
+```{r}
+data <- read_delim(file_path, delim = "\t", show_col_types = FALSE)
+```
+
+### 1.2. Dimensiones y estructura
+
+A continuación vamos a ver cual es la dimensión y la estructura del dataset.
+
+```{r}
+dim(data)
+str(data)
+```
+
+Como podemos ver el dataset está compuesto por un total de **2240 observaciones** y **29 variables**.
+
+A continuación, explicamos que significado tiene cada columna agrupado por temática:
+
+-   **Variables sociodemográficas**:
+    -   **ID**: Identificador único del cliente.
+    -   **Year_Birth**: Año de nacimiento del cliente (nos permitirá derivar la edad).
+    -   **Education**: Nivel educativo del cliente (variable categórica).
+    -   **Marital_Status**: Estado civil del cliente (variable categórica).
+    -   **Income**: Ingresos anuales del hogar del cliente.
+    -   **Kidhome**: Número de niños en el hogar.
+    -   **Teenhome**: Número de adolescentes en el hogar.
+    -   **Dt_Customer**: Fecha de alta/inscripción del cliente en la compañía.
+    -   **Recency**: Número de días desde la última compra del cliente.
+    -   **Complain**: Indicador de queja (1 si el cliente ha presentado queja en los últimos 2 años, 0 si no).
+-   **Variables de gasto por producto**: Representan el **importe gastado en los últimos 2 años** en cada categoría:
+    -   **MntWines**: Gasto en vino.
+    -   **MntFruits**: Gasto en frutas.
+    -   **MntMeatProducts**: Gasto en carne.
+    -   **MntFishProducts**: Gasto en pescado.
+    -   **MntSweetProducts**: Gasto en dulces.
+    -   **MntGoldProds**: Gasto en productos de oro.
+-   **Variables de promociones y campañas**:
+    -   **NumDealsPurchases**: Número de compras realizadas con descuento.
+    -   **AcceptedCmp1**: 1 si el cliente aceptó la oferta de la campaña 1, 0 si no.
+    -   **AcceptedCmp2**: 1 si el cliente aceptó la oferta de la campaña 2, 0 si no.
+    -   **AcceptedCmp3**: 1 si el cliente aceptó la oferta de la campaña 3, 0 si no.
+    -   **AcceptedCmp4**: 1 si el cliente aceptó la oferta de la campaña 4, 0 si no.
+    -   **AcceptedCmp5**: 1 si el cliente aceptó la oferta de la campaña 5, 0 si no.
+    -   **Response**: 1 si el cliente aceptó la oferta de la última campaña, 0 si no.
+-   **Variables de canal de compra**:
+    -   **NumWebPurchases**: Número de compras realizadas a través de la web.
+    -   **NumCatalogPurchases**: Número de compras realizadas mediante catálogo.
+    -   **NumStorePurchases**: Número de compras realizadas en tienda física.
+    -   **NumWebVisitsMonth**: Número de visitas a la web en el último mes.
+-   **Variables adicionales del dataset**: En el dataset aparecen además las variables:
+    -   **Z_CostContact**: Coste de contacto. En este dataset aparece como una variable **constante** (mismo valor para todos los registros), por lo que no aportará información para el análisis.
+    -   **Z_Revenue**: Ingreso asociado. Al igual que la anterior, suele venir como variable **constante** en este dataset, por lo que su utilidad analítica es limitada.
+
+Una vez explicado el significado de cada columna pasamos a echarle un primer vistazo al dataset:
+
+```{r}
+head(data)
+```
+
+## 2. Auditoría de calidad: Limpieza y tratamiento inicial del dataset
+
+En esta sección realizamos una auditoría básica de calidad de los datos antes de comenzar con transformaciones más avanzadas. El objetivo es:
+
+-   Detectar posibles observaciones duplicadas.
+-   Verificar si existen múltiples registros por cliente.
+-   Analizar los niveles de las variables categóricas y convertir a *factor*.
+-   Identificar valores faltantes (especialmente en `Income`).
+-   Convertir variables al tipo adecuado (por ejemplo, `Dt_Customer`).
+-   Detectar y eliminar variables constantes que no aportan información.
+
+Este paso es fundamental para garantizar la consistencia del dataset y evitar sesgos o errores en los análisis posteriores.
+
+### 2.1. Comprobación de duplicados
+
+En primer lugar, analizamos si existen observaciones duplicadas en el dataset, tanto a nivel de fila completa como a nivel del identificador del cliente (`ID`).
+
+¿Existen observaciones repetidas?
+
+```{r}
+n_dup_rows <- sum(duplicated(data))
+n_dup_rows
+```
+
+Como podemos ver no existen observaciones repetidas. ¿Existen observaciones con mismo `ID`?
+
+```{r}
+n_dup_ids <- sum(duplicated(data$ID))
+n_dup_ids
+```
+
+Podemos confirmar que el dataset tiene una estructura correcta de **una observación por cliente**.
+
+> La variable `ID` es un identificador único del cliente. Aunque no aporta información predictiva o descriptiva sobre el comportamiento del cliente, se conserva en el dataset por motivos de trazabilidad. En análisis posteriores (por ejemplo, clustering o segmentación), esta variable será excluida explícitamente del conjunto de variables explicativas, ya que su inclusión podría introducir ruido.
+
+### 2.2. Tratamiento de variables categóricas
+
+Antes de convertir variables a tipo factor o agrupar categorías, examinamos los valores existentes en `Education` y `Marital_Status` y cuantas veces se repite cada uno.
+
+```{r}
+data %>% count(Education, sort = TRUE)
+data %>% count(Marital_Status, sort = TRUE)
+```
+
+En el caso de `Education` hemos decidido crear un factor siguiendo el orden `Basic < 2n Cycle < Graduation < Master < PhD`, donde cada categoría significa lo siguiente:
+
+-   `Basic`: persona con una educación básica (no universitaria).
+-   `2n Cycle`: persona con estudios superiores de ciclo corto o educación universitaria inicial (por ejemplo, diplomatura o programa universitario de 2–3 años), sin alcanzar necesariamente un título de grado completo.
+-   `Graduation`: persona con un título universitario estándar (*Bachelor*).
+-   `Master`: persona con estudios de posgrado.
+-   `PhD`: persona con un doctorado.
+
+En el caso de `Marital_Status`, hemos decidido eliminar las observaciones que contienen `YOLO` y `Absurd` ya que no aportan información a esta variable y son pocas observaciones. Además, hemos decidido agrupar `Single` y `Alone` en `Single` ya que significan lo mismo. Por tanto, las categorías (sin orden) que quedan son:
+
+-   `Single`: persona soltera (sin pareja).
+-   `Together`: persona con pareja pero no está casada.
+-   `Married`: persona que está casada.
+-   `Divorced`: persona que ha estado casada pero que se ha divorciado y sin pareja.
+-   `Widow`: viudo/viuda y sin pareja.
+
+```{r}
+data$Education <- factor(
+  data$Education, 
+  levels = c("Basic", "2n Cycle", "Graduation", "Master", "PhD"), 
+  ordered = TRUE
+)
+
+levels(data$Education)
+is.ordered(data$Education)
+```
+
+```{r}
+data <- data %>%
+  filter(!Marital_Status %in% c("YOLO", "Absurd")) %>%
+  mutate(Marital_Status = ifelse(Marital_Status=="Alone", "Single", Marital_Status)) %>%
+  mutate(Marital_Status = factor(
+    Marital_Status,
+    levels = c("Single", "Together", "Married", "Divorced", "Widow")
+  ))
+
+levels(data$Marital_Status)
+is.ordered(data$Marital_Status)
+```
+
+### 2.3. Análisis de valores faltantes
+
+A continuación analizamos la existencia de valores nulos en el dataset.
+
+```{r}
+colSums(is.na(data))
+```
+
+En este dataset, la variable que puede presentar valores faltantes es `Income`.
+
+```{r}
+sum(is.na(data$Income))
+mean(is.na(data$Income))
+```
+
+Procedemos a eliminar las observaciones con `Income` nulo ya que:
+
+-   El número de observaciones eliminadas es reducido.
+-   `Income` es una variable clave para muchos de los análisis planteados.
+-   Imputar sin un criterio sólido podría introducir distorsiones.
+
+```{r}
+data <- data %>% filter(!is.na(Income))
+```
+
+### 2.4. Conversión de la variable fecha
+
+La variable `Dt_Customer` se encuentra en formato carácter y representa la fecha de alta del cliente en la compañía. Para poder realizar análisis temporales (por ejemplo, calcular antigüedad), es necesario convertirla al tipo `Date`.
+
+Dado que el formato es *dd-mm-aaaa*, utilizamos la función `dmy()` del paquete lubridate.
+
+```{r}
+data <- data %>% mutate(Dt_Customer = dmy(Dt_Customer))
+```
+
+```{r}
+summary(data$Dt_Customer)
+```
+
+> El rango temporal de `Dt_Customer` indica que el dataset recoge información aproximadamente entre 2012 y 2014. Por tanto, en futuros cálculos derivados (como edad o antigüedad), se utilizará como referencia temporal el año final del dataset en lugar del año actual, para mantener coherencia histórica.
+
+### 2.5. Identificación y eliminación de variables constantes
+
+El dataset incluye dos variables adicionales: `Z_CostContact` y `Z_Revenue.`
+
+Comprobamos si estas variables presentan más de un valor distinto:
+
+```{r}
+data %>%
+  summarise(
+    unique_Z_CostContact = n_distinct(Z_CostContact),
+    unique_Z_Revenue = n_distinct(Z_Revenue)
+  )
+```
+
+Como ambas variables presentan un único valor para todas las observaciones, significa que son variables constantes (varianza cero). En ese caso:
+
+-   No aportan información discriminativa.
+-   No contribuyen al análisis estadístico ni a modelos predictivos.
+-   Pueden eliminarse sin pérdida de información relevante.
+
+Procedemos a eliminarlas:
+
+```{r}
+data <- data %>% select(-Z_CostContact, -Z_Revenue)
+```
+
+### 2.6. Resumen tras la limpieza y tratamiento inicial
+
+Tras la auditoría y el tratamiento inicial del dataset, se han realizado las siguientes acciones:
+
+-   Se ha verificado que no existen observaciones duplicadas ni múltiples registros por cliente, confirmando que el dataset mantiene una estructura de una fila por cliente.
+-   Se ha decidido conservar la variable `ID` únicamente como identificador para trazabilidad, excluyéndola de futuros análisis predictivos.
+-   Se han revisado y normalizado las variables categóricas `Education` y `Marital_Status`:
+    -   `Education` se ha convertido en un factor ordenado con el orden lógico de nivel educativo.
+    -   `Marital_Status` se ha limpiado eliminando categorías anómalas (*YOLO*, *Absurd*) y agrupando *Alone* dentro de *Single.*
+-   Se han analizado los valores faltantes y se han eliminado las observaciones con `Income` nulo, dado que representan un porcentaje reducido y esta variable es clave para el análisis.
+-   Se ha convertido `Dt_Customer` al tipo `Date`, permitiendo futuros análisis temporales.
+-   Se han identificado y eliminado las variables constantes `Z_CostContact` y `Z_Revenue`, al no aportar información discriminativa.
+
+Tras estos pasos, el dataset queda depurado, consistente y preparado para la creación de variables derivadas.
+
+## 3. Feature Engineering - Creación de variables derivadas
+
+Una vez finalizada la fase de limpieza y tipado del dataset, procedemos a una etapa clave como es la *ingeniería de características* (**feature engineering**).
+
+El objetivo de esta fase es transformar las variables originales en nuevas variables más informativas, interpretables o analíticamente útiles. En muchos casos, las variables derivadas permiten:
+
+-   capturar mejor patrones de comportamiento,
+-   sintetizar información dispersa en múltiples columnas,
+-   y facilitar la respuesta a las preguntas de investigación planteadas en el proyecto.
+
+Dado que el dataset recoge información aproximadamente entre 2012 y 2014, se utilizará como referencia temporal el año 2014 para el cálculo de variables derivadas relacionadas con edad o antigüedad, garantizando coherencia histórica.
+
+### 3.1. Variables demográficas derivadas
+
+Las variables demográficas originales proporcionan información básica como el año de nacimiento y la estructura familiar. Sin embargo, para el análisis resulta más interpretable trabajar con la edad directamente y con variables agregadas del hogar.
+
+#### 3.1.1. Cálculo de la edad
+
+Aunque el dataset incluye `Year_Birth`, resulta más intuitivo trabajar con la variable `Age`. Para evitar incoherencias temporales (ya que los datos no son actuales), utilizamos como referencia el año final del dataset (2014).
+
+```{r}
+reference_year <- 2014
+
+data <- data %>%
+  mutate(Age = reference_year-Year_Birth) %>%
+  filter(Age <= 100)
+```
+
+Esta transformación permitirá:
+
+-   Analizar patrones de consumo por grupos de edad.
+-   Evaluar la relación entre edad y tipo de producto consumido.
+-   Facilitar segmentaciones futuras basadas en etapas del ciclo vital.
+
+> Se eliminan aquellas observaciones cuya edad calculada supera los 100 años, al considerarse valores atípicos o potenciales errores de registro. Este criterio permite mantener la coherencia demográfica del dataset sin afectar significativamente al tamaño muestral.
+
+#### 3.1.2. Estructura familiar agregada
+
+El dataset distingue entre número de niños (`Kidhome`) y adolescentes (`Teenhome`). Para simplificar el análisis y capturar mejor la estructura familiar, creamos:
+
+-   Una variable con el número total de menores en el hogar.
+-   Un indicador binario de presencia de hijos.
+
+```{r}
+data <- data %>%
+  mutate(
+    Children_Home = Kidhome + Teenhome,
+    Has_Children = ifelse(Children_Home>0, 1, 0)
+  )
+```
+
+Estas variables permitirán analizar:
+
+-   Si la estructura familiar influye en el patrón de consumo.
+-   Si los hogares con hijos presentan mayor gasto en determinadas categorías.
+-   Si existe relación entre tener hijos y responder a promociones.
+
+### 3.2. Variables agregadas de gasto
+
+El dataset incluye seis variables distintas de gasto por categoría de producto. Aunque es útil analizar cada una por separado, resulta conveniente sintetizar la información en indicadores globales.
+
+#### 3.2.1. Gasto total
+
+Creamos una variable `Total_Spending` que suma el gasto total realizado en los últimos dos años.
+
+```{r}
+data <- data %>%
+  mutate(Total_Spending = MntWines+ MntFruits+MntMeatProducts+
+           MntFishProducts+MntSweetProducts+MntGoldProds)
+```
+
+Esta variable permitirá:
+
+-   Analizar la rentabilidad global del cliente.
+-   Comparar niveles de gasto entre segmentos.
+-   Evaluar si los clientes que compran con descuento generan realmente mayor valor.
+
+### 3.3. Variables de comportamiento de compra
+
+Las variables de canal y descuentos pueden sintetizarse para capturar mejor la intensidad y estrategia de compra del cliente.
+
+#### 3.3.1. Número total de compras
+
+```{r}
+data <- data %>%
+  mutate(Total_Purchases = NumWebPurchases+NumCatalogPurchases+NumStorePurchases)
+```
+
+Esta variable permite:
+
+-   Analizar la intensidad de compra global.
+-   Evaluar si el uso de múltiples canales aumenta el volumen de compras.
+-   Comparar clientes frecuentes frente a esporádicos.
+
+#### 3.3.2. Dependencia de descuentos
+
+Para evaluar si un cliente depende excesivamente de promociones, calculamos la proporción de compras realizadas con descuento.
+
+```{r}
+data <- data %>%
+  mutate(Deals_Ratio = ifelse(Total_Purchases>0, NumDealsPurchases/Total_Purchases, 0))
+```
+
+> Cuando el número total de compras es 0, se evita la división por cero asignando el valor 0 al ratio de compras con descuento. Esto garantiza la ausencia de valores `NaN` y mantiene la interpretabilidad de la variable.
+
+Esta variable será clave para responder a la pregunta: *¿Son los clientes que compran con descuentos realmente rentables a largo plazo?*
+
+### 3.4. Variables agregadas de respuesta a campañas
+
+El dataset incluye cinco campañas históricas y una última campaña (`Response`). Para facilitar el análisis, sintetizamos esta información.
+
+#### 3.4.1. Número total de campañas aceptadas
+
+```{r}
+data <- data %>%
+  mutate(Total_Campaigns_Accepted = AcceptedCmp1+AcceptedCmp2+AcceptedCmp3+AcceptedCmp4+AcceptedCmp5)
+```
+
+Esto permite medir la predisposición histórica del cliente a aceptar ofertas.
+
+#### 3.4.2. Indicador global de respuesta
+
+```{r}
+data <- data %>%
+  mutate(Responded_Any_Campaign = ifelse(Total_Campaigns_Accepted>0 | Response==1, 1, 0))
+```
+
+Esta variable facilita:
+
+-   Analizar perfiles de clientes receptivos a marketing.
+-   Evaluar la relación entre educación e interacción con campañas.
+-   Identificar segmentos más sensibles a promociones.
+
+### 3.5. Antigüedad del cliente
+
+La variable `Dt_Customer` permite calcular el tiempo que el cliente lleva en la empresa. Utilizamos como referencia el 31 de diciembre de 2014.
+
+```{r}
+data <- data %>%
+  mutate(Tenure_Days = as.numeric(as.Date("2014-12-31") - Dt_Customer))
+```
+
+Esta variable permitirá estudiar:
+
+-   Si los clientes más antiguos gastan más.
+-   Si la fidelización está asociada a mayor respuesta a campañas.
+-   Diferencias entre clientes nuevos y consolidados.
+
+### 3.6. Resumen de variables derivadas creadas
+
+En esta sección resumimos las variables creadas durante la fase de *feature engineering*. Estas variables no sustituyen necesariamente a las originales, sino que las complementan mediante agregaciones o transformaciones que permiten capturar mejor patrones del comportamiento del cliente.
+
+Las variables derivadas se han diseñado para ser:
+
+-   **Más interpretables** (por ejemplo, `Age` en lugar de `Year_Birth`).
+-   **Más informativas** mediante agregación (por ejemplo, `Total_Spending` como gasto total).
+-   **Más alineadas con las preguntas del proyecto**, especialmente en aspectos de rentabilidad, estructura familiar, dependencia de descuentos y respuesta a campañas.
+
+A continuación, se muestra un resumen con el significado de cada variable derivada:
+
+-   **Age**: edad del cliente calculada con referencia temporal 2014 (`Age = 2014-Year_Birth`).
+-   **Children_Home**: número total de menores en el hogar (`Kidhome+Teenhome`).
+-   **Has_Children**: indicador binario (1 si el hogar tiene menores, 0 si no).
+-   **Total_Spending**: gasto total del cliente en los últimos 2 años (suma de las seis categorías de gasto).
+-   **Total_Purchases**: número total de compras considerando los tres canales (web, catálogo y tienda).
+-   **Deals_Ratio**: proporción de compras realizadas con descuento (`NumDealsPurchases/Total_Purchases`).
+-   **Total_Campaigns_Accepted**: número total de campañas históricas aceptadas (suma de `AcceptedCmp1…AcceptedCmp5`).
+-   **Responded_Any_Campaign**: indicador binario (1 si aceptó alguna campaña histórica o la última campaña, 0 si no).
+-   **Tenure_Days**: antigüedad del cliente en días desde su alta hasta el 31/12/2014.
+
+Estas variables se utilizarán en notebooks posteriores para realizar análisis descriptivos, comparaciones entre segmentos y responder a las preguntas planteadas.
+
+```{r}
+derived_vars <- c( "Age", "Children_Home", "Has_Children", "Total_Spending",
+                   "Total_Purchases", "Deals_Ratio", "Total_Campaigns_Accepted",
+                   "Responded_Any_Campaign", "Tenure_Days")
+
+data %>% select(all_of(derived_vars)) %>% str()
+```
+
+## 4. Dataset final
+
+Tras las fases de limpieza y *feature engineering*, revisamos el dataset final para confirmar:
+
+-   Número de observaciones y variables disponibles.
+-   Estructura (tipos) de las variables.
+-   Variables actuales (originales + derivadas).
+-   Guardado del dataset limpio para su uso en notebooks posteriores.
+-   Tamaño del fichero generado.
+
+### 4.1. Dimensiones y estructura del dataset final
+
+```{r}
+dim(data)
+str(data)
+```
+
+Tras eliminar observaciones y añadir y eliminar variables nos hemos quedado con un total de **2209 observaciones** y **36 variables**.
+
+### 4.2. Variables del dataset final
+
+A continuación se resume el significado de las variables del dataset final, agrupadas por temática:
+
+-   **Variables sociodemográficas y estado del cliente**:
+
+    -   **ID**: Identificador único del cliente (se mantiene por trazabilidad).
+    -   **Year_Birth**: Año de nacimiento.
+    -   **Age** *(derivada)*: Edad estimada del cliente (`2014-Year_Birth`).
+    -   **Education**: Nivel educativo (factor ordenado: `Basic < 2n Cycle < Graduation < Master < PhD`).
+    -   **Marital_Status**: Estado civil procesado (`Single`, `Together`, `Married`, `Divorced`, `Widow`).
+    -   **Income**: Ingresos anuales del hogar.
+    -   **Kidhome**: Nº de niños en el hogar.
+    -   **Teenhome**: Nº de adolescentes en el hogar.
+    -   **Children_Home** *(derivada)*: Total de menores en el hogar (`Kidhome+Teenhome`).
+    -   **Has_Children** *(derivada)*: Indicador binario de presencia de menores en el hogar.
+    -   **Dt_Customer**: Fecha de alta del cliente (convertida a tipo Date).
+    -   **Tenure_Days** *(derivada)*: Antigüedad del cliente en días desde alta hasta *31/12/2014*.
+    -   **Recency**: Días desde la última compra.
+    -   **Complain**: 1 si el cliente presentó queja en los últimos 2 años, 0 si no.
+
+-   **Variables de gasto por producto (últimos 2 años)**:
+
+    -   **MntWines**: Gasto en vino.
+    -   **MntFruits**: Gasto en frutas.
+    -   **MntMeatProducts**: Gasto en carne.
+    -   **MntFishProducts**: Gasto en pescado.
+    -   **MntSweetProducts**: Gasto en dulces.
+    -   **MntGoldProds**: Gasto en productos de oro.
+    -   **Total_Spending** *(derivada)*: Gasto total en productos (suma de las seis categorías).
+
+-   **Variables de promociones y campañas**:
+
+    -   **NumDealsPurchases**: Nº de compras realizadas con descuento.
+    -   **Deals_Ratio** *(derivada)*: Proporción de compras con descuento respecto al total de compras.
+    -   **AcceptedCmp1..AcceptedCmp5**: Indicadores 0/1 de aceptación de campañas 1 a 5.
+    -   **Total_Campaigns_Accepted** *(derivada)*: Nº total de campañas históricas aceptadas.
+    -   **Response**: 1 si aceptó la última campaña, 0 si no.
+    -   **Responded_Any_Campaign** *(derivada)*: Indicador global (1 si aceptó alguna campaña histórica o la última, 0 si no).
+
+-   **Variables de canal de compra**:
+
+    -   **NumWebPurchases**: Nº de compras a través de la web.
+    -   **NumCatalogPurchases**: Nº de compras por catálogo.
+    -   **NumStorePurchases**: Nº de compras en tienda.
+    -   **Total_Purchases** *(derivada)*: Total de compras en los tres canales.
+    -   **NumWebVisitsMonth**: Nº de visitas a la web en el último mes.
+
+Finalmente, se recuerda que las variables constantes del dataset original (**Z_CostContact** y **Z_Revenue**) han sido eliminadas por no aportar información.
+
+### 4.3. Visualización, guardado del dataset final
+
+```{r}
+head(data)
+```
+
+```{r}
+output_path <- "./data/marketing_campaign_processed.csv"
+write_csv(data, output_path)
+```
+
+```{r}
+clean_size_bytes <- file.info(output_path)$size
+clean_size_mb <- clean_size_bytes / (1024^2)
+clean_size_mb
+```
+
+Como podemos ver el archivo ocupa aproximadamente **0.27 MB**.
+
+Con este notebook se garantiza que el proceso de preparación de los datos es reproducible y que los siguientes notebooks podrán partir directamente del dataset limpio y enriquecido, evitando repetir transformaciones.
