@@ -1,0 +1,160 @@
+---
+title: "CustomerLens-Analytics. 1º pregunta individual."
+author: "Jaime Linares Barrera"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    # number_sections: true
+---
+
+# La guerra de los canales: El cliente contraataca
+
+## 1. Introducción
+
+En un contexto empresarial cada vez más orientado a la **experiencia del cliente**, comprender cómo los distintos canales de compra influyen en el comportamiento posterior del consumidor resulta fundamental. Actualmente, las organizaciones interactúan con sus clientes a través de varios canales integrados (como la web, el catálogo o la tienda física) que forman parte de una estrategia comercial coordinada. Sin embargo, no todos los canales generan la misma percepción de servicio ni ofrecen una experiencia de compra equivalente, lo que puede traducirse en diferencias en la satisfacción, la fidelización o incluso en la probabilidad de que el cliente presente una queja.
+
+En este contexto surge la siguiente pregunta de investigación:
+
+> ¿Existe relación entre el canal de compras y la presentación de quejas por parte del cliente?
+
+Responder a esta cuestión resulta especialmente relevante desde una perspectiva estratégica y de gestión. Si determinados canales concentran una mayor proporción de quejas, podría indicar problemas operativos específicos (logística, tiempos de entrega, atención postventa, experiencia digital, etc.) o diferencias en las expectativas del cliente según el medio utilizado. Detectar este tipo de patrones permite a la empresa priorizar acciones de mejora y optimizar la experiencia de compra.
+
+En este análisis utilizamos la variable `Complain`, que indica si el cliente presentó alguna queja en los últimos dos años, junto con las variables que recogen el número de compras realizadas en cada canal: web, catálogo y tienda física. A partir de esta información, evaluaremos si el comportamiento de compra por canal está asociado con la probabilidad de que el cliente haya presentado una queja.
+
+### 1.1. Objetivos
+
+El estudio persigue los siguientes objetivos:
+
+-   Analizar descriptivamente la distribución de quejas en función del comportamiento de compra por canal.
+-   Evaluar formalmente si existe asociación estadísticamente significativa entre el canal de compras y la variable de queja.
+-   Cuantificar la intensidad de dicha asociación mediante medidas de tamaño del efecto.
+-   Modelizar la probabilidad de queja en función del uso de los distintos canales, con el fin de estimar el impacto relativo de cada uno de ellos.
+
+De este modo, el análisis no solo permitirá determinar si existe relación, sino también comprender su magnitud y relevancia práctica desde una perspectiva de negocio.
+
+## 2. Definición metodológica y planteamiento estadístico
+
+### 2.1. Naturaleza de las variables
+
+Para abordar la pregunta de investigación, es necesario caracterizar formalmente las variables implicadas:
+
+-   **Variable respuesta** (dependiente):
+    -   `Complain`: variable **cualitativa binaria**, donde:
+        -   1: el cliente presentó al menos una queja en los últimos dos años.
+        -   0: el cliente no presentó quejas en dicho periodo.
+-   **Variables explicativas** (canales de compra): Estas variables representan el número de compras realizadas por el cliente en cada canal, por lo que son variables **cuantitativas discretas**.
+    -   `NumWebPurchases`
+    -   `NumCatalogPurchases`
+    -   `NumStorePurchases`
+
+Dado que el dataset no contiene directamente una variable categórica que identifique el *canal principal* del cliente, será necesario construir variables derivadas que permitan analizar la relación desde una perspectiva categórica y también desde una perspectiva probabilística.
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
