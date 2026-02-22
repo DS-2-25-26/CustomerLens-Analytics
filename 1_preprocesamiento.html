@@ -1743,15 +1743,13 @@ n_dup_ids</code></pre>
 <pre><code>## [1] 0</code></pre>
 <p>Podemos confirmar que el dataset tiene una estructura correcta de
 <strong>una observación por cliente</strong>.</p>
-<blockquote>
-<p>La variable <code>ID</code> es un identificador único del cliente.
-Aunque no aporta información predictiva o descriptiva sobre el
+<p><em>NOTA: La variable <code>ID</code> es un identificador único del
+cliente. Aunque no aporta información predictiva o descriptiva sobre el
 comportamiento del cliente, se conserva en el dataset por motivos de
 trazabilidad. En análisis posteriores (por ejemplo, clustering o
 segmentación), esta variable será excluida explícitamente del conjunto
 de variables explicativas, ya que su inclusión podría introducir
-ruido.</p>
-</blockquote>
+ruido.</em></p>
 </div>
 <div id="tratamiento-de-variables-categóricas" class="section level3">
 <h3>2.2. Tratamiento de variables categóricas</h3>
@@ -1881,13 +1879,11 @@ necesario convertirla al tipo <code>Date</code>.</p>
 <pre class="r"><code>summary(data$Dt_Customer)</code></pre>
 <pre><code>##         Min.      1st Qu.       Median         Mean      3rd Qu.         Max. 
 ## &quot;2012-07-30&quot; &quot;2013-01-16&quot; &quot;2013-07-09&quot; &quot;2013-07-10&quot; &quot;2013-12-31&quot; &quot;2014-06-29&quot;</code></pre>
-<blockquote>
-<p>El rango temporal de <code>Dt_Customer</code> indica que el dataset
-recoge información aproximadamente entre 2012 y 2014. Por tanto, en
-futuros cálculos derivados (como edad o antigüedad), se utilizará como
-referencia temporal el año final del dataset en lugar del año actual,
-para mantener coherencia histórica.</p>
-</blockquote>
+<p><em>NOTA: El rango temporal de <code>Dt_Customer</code> indica que el
+dataset recoge información aproximadamente entre 2012 y 2014. Por tanto,
+en futuros cálculos derivados (como edad o antigüedad), se utilizará
+como referencia temporal el año final del dataset en lugar del año
+actual, para mantener coherencia histórica.</em></p>
 </div>
 <div id="identificación-y-eliminación-de-variables-constantes" class="section level3">
 <h3>2.5. Identificación y eliminación de variables constantes</h3>
@@ -1991,12 +1987,11 @@ data &lt;- data %&gt;%
 <li>Facilitar segmentaciones futuras basadas en etapas del ciclo
 vital.</li>
 </ul>
-<blockquote>
-<p>Se eliminan aquellas observaciones cuya edad calculada supera los 100
-años, al considerarse valores atípicos o potenciales errores de
-registro. Este criterio permite mantener la coherencia demográfica del
-dataset sin afectar significativamente al tamaño muestral.</p>
-</blockquote>
+<p><em>NOTA: Se eliminan aquellas observaciones cuya edad calculada
+supera los 100 años, al considerarse valores atípicos o potenciales
+errores de registro. Este criterio permite mantener la coherencia
+demográfica del dataset sin afectar significativamente al tamaño
+muestral.</em></p>
 </div>
 <div id="estructura-familiar-agregada" class="section level4">
 <h4>3.1.2. Estructura familiar agregada</h4>
@@ -2064,12 +2059,10 @@ compras.</li>
 calculamos la proporción de compras realizadas con descuento.</p>
 <pre class="r"><code>data &lt;- data %&gt;%
   mutate(Deals_Ratio = ifelse(Total_Purchases&gt;0, NumDealsPurchases/Total_Purchases, 0))</code></pre>
-<blockquote>
-<p>Cuando el número total de compras es 0, se evita la división por cero
-asignando el valor 0 al ratio de compras con descuento. Esto garantiza
-la ausencia de valores <code>NaN</code> y mantiene la interpretabilidad
-de la variable.</p>
-</blockquote>
+<p><em>NOTA: Cuando el número total de compras es 0, se evita la
+división por cero asignando el valor 0 al ratio de compras con
+descuento. Esto garantiza la ausencia de valores <code>NaN</code> y
+mantiene la interpretabilidad de la variable.</em></p>
 <p>Esta variable será clave para responder a la pregunta: <em>¿Son los
 clientes que compran con descuentos realmente rentables a largo
 plazo?</em></p>

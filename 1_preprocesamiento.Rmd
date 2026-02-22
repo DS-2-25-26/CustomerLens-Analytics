@@ -138,7 +138,7 @@ n_dup_ids
 
 Podemos confirmar que el dataset tiene una estructura correcta de **una observación por cliente**.
 
-> La variable `ID` es un identificador único del cliente. Aunque no aporta información predictiva o descriptiva sobre el comportamiento del cliente, se conserva en el dataset por motivos de trazabilidad. En análisis posteriores (por ejemplo, clustering o segmentación), esta variable será excluida explícitamente del conjunto de variables explicativas, ya que su inclusión podría introducir ruido.
+*NOTA: La variable `ID` es un identificador único del cliente. Aunque no aporta información predictiva o descriptiva sobre el comportamiento del cliente, se conserva en el dataset por motivos de trazabilidad. En análisis posteriores (por ejemplo, clustering o segmentación), esta variable será excluida explícitamente del conjunto de variables explicativas, ya que su inclusión podría introducir ruido.*
 
 ### 2.2. Tratamiento de variables categóricas
 
@@ -228,7 +228,7 @@ data <- data %>% mutate(Dt_Customer = dmy(Dt_Customer))
 summary(data$Dt_Customer)
 ```
 
-> El rango temporal de `Dt_Customer` indica que el dataset recoge información aproximadamente entre 2012 y 2014. Por tanto, en futuros cálculos derivados (como edad o antigüedad), se utilizará como referencia temporal el año final del dataset en lugar del año actual, para mantener coherencia histórica.
+*NOTA: El rango temporal de `Dt_Customer` indica que el dataset recoge información aproximadamente entre 2012 y 2014. Por tanto, en futuros cálculos derivados (como edad o antigüedad), se utilizará como referencia temporal el año final del dataset en lugar del año actual, para mantener coherencia histórica.*
 
 ### 2.5. Identificación y eliminación de variables constantes
 
@@ -305,7 +305,7 @@ Esta transformación permitirá:
 -   Evaluar la relación entre edad y tipo de producto consumido.
 -   Facilitar segmentaciones futuras basadas en etapas del ciclo vital.
 
-> Se eliminan aquellas observaciones cuya edad calculada supera los 100 años, al considerarse valores atípicos o potenciales errores de registro. Este criterio permite mantener la coherencia demográfica del dataset sin afectar significativamente al tamaño muestral.
+*NOTA: Se eliminan aquellas observaciones cuya edad calculada supera los 100 años, al considerarse valores atípicos o potenciales errores de registro. Este criterio permite mantener la coherencia demográfica del dataset sin afectar significativamente al tamaño muestral.*
 
 #### 3.1.2. Estructura familiar agregada
 
@@ -374,7 +374,7 @@ data <- data %>%
   mutate(Deals_Ratio = ifelse(Total_Purchases>0, NumDealsPurchases/Total_Purchases, 0))
 ```
 
-> Cuando el número total de compras es 0, se evita la división por cero asignando el valor 0 al ratio de compras con descuento. Esto garantiza la ausencia de valores `NaN` y mantiene la interpretabilidad de la variable.
+*NOTA: Cuando el número total de compras es 0, se evita la división por cero asignando el valor 0 al ratio de compras con descuento. Esto garantiza la ausencia de valores `NaN` y mantiene la interpretabilidad de la variable.*
 
 Esta variable será clave para responder a la pregunta: *¿Son los clientes que compran con descuentos realmente rentables a largo plazo?*
 
