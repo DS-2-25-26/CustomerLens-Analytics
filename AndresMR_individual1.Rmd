@@ -1,0 +1,142 @@
+---
+title: "CustomerLens-Analytics. Pregunta individual Andrés."
+author: "Andrés Martínez Reviriego"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+---
+
+# ¿Descuentos = rentables o pérdidas?
+
+## 1. Introducción
+
+Pregunta de investigación:  
+**¿Son los clientes que compran con descuentos realmente rentables a largo plazo, o estamos subvencionando a clientes de bajo valor?**
+
+En muchos contextos de negocio, los descuentos se utilizan para estimular la compra a corto plazo. Sin embargo, una mayor intensidad promocional no siempre implica una mayor rentabilidad. Puede ocurrir que parte de los clientes que dependen de descuentos compren con frecuencia, pero generen menos valor económico neto que aquellos que compran sin promociones continuas.
+
+Desde una perspectiva estratégica, esta pregunta es especialmente relevante porque condiciona la política comercial de la empresa: mantener promociones generalizadas, rediseñarlas para segmentos concretos o reducir su intensidad cuando no aportan valor sostenible.
+
+En este análisis utilizamos como variable principal `Deals_Ratio` (proporción de compras con descuento sobre el total de compras) y la contrastamos frente a indicadores de valor del cliente. Dado que no disponemos de variables directas de margen o coste por cliente, trabajaremos con **proxies de rentabilidad** basadas en el gasto y en la intensidad de compra.
+
+### 1.1. Objetivos
+
+Este análisis persigue los siguientes objetivos:
+
+-   Describir cómo cambia el valor del cliente según su dependencia de descuentos.
+-   Comparar perfiles de clientes con uso bajo, medio y alto de promociones.
+-   Evaluar si los clientes más dependientes de descuentos presentan señales de menor valor económico.
+
+De este modo, el estudio no se limita a una comparación descriptiva, sino que prepara un marco analítico coherente para responder a la pregunta de negocio con evidencia cuantitativa.
+
+## 2. Carga de datos y variables de trabajo
+
+En primer lugar cargamos las librerías necesarias para manipulación de datos (`dplyr`), lectura de ficheros (`readr`) y visualización (`ggplot2`). A continuación, importamos el dataset preprocesado generado en el notebook de limpieza, lo que garantiza consistencia metodológica con el resto del proyecto.
+
+También definimos explícitamente las variables que vamos a utilizar en este análisis. Esta selección incluye:
+
+-   La variable clave de descuentos (`Deals_Ratio`).
+-   Variables de valor económico (`Total_Spending`, `Total_Purchases`, `Tenure_Days`).
+-   Variables de control relevantes para análisis posteriores (`Income`, `Recency`, `Age`, `Children_Home` y compras por canal).
+
+Finalmente, inspeccionamos la estructura (`str`) para verificar tipos y detectar posibles inconsistencias antes de crear nuevas métricas.
+
+```{r}
+library(dplyr)
+library(readr)
+library(ggplot2)
+
+data <- read_csv("./data/marketing_campaign_processed.csv", show_col_types = FALSE)
+
+vars_objetivo <- c(
+  "Deals_Ratio", "Total_Spending", "Total_Purchases", "Tenure_Days",
+  "Income", "Recency", "Age", "Children_Home",
+  "NumWebPurchases", "NumCatalogPurchases", "NumStorePurchases"
+)
+
+data %>% select(all_of(vars_objetivo)) %>% str()
+```
+
+## 3. Definición operativa de rentabilidad (proxies)
+
+Como el dataset no incluye beneficio real por cliente (margen neto, costes logísticos o coste promocional individual), definimos dos indicadores proxy que aproximan la rentabilidad desde distintas perspectivas:
+
+-   `Value_Annual`: gasto total anualizado según la antigüedad observada del cliente. Permite comparar clientes con diferente tiempo de relación con la empresa.
+-   `Spend_Per_Purchase`: gasto medio por compra (ticket medio), útil para identificar si la compra incentivada por descuento mantiene un valor unitario razonable.
+
+Adicionalmente, se controla el riesgo de divisiones inválidas:
+
+-   Si `Tenure_Days <= 0`, se asigna `NA` en `Value_Annual`.
+-   Si `Total_Purchases == 0`, se asigna `0` en `Spend_Per_Purchase`.
+
+Esta construcción mejora la interpretabilidad de los resultados y evita problemas técnicos en pasos posteriores.
+
+```{r}
+data <- data %>%
+  mutate(
+    Value_Annual = ifelse(Tenure_Days > 0, Total_Spending / (Tenure_Days / 365), NA_real_),
+    Spend_Per_Purchase = ifelse(Total_Purchases > 0, Total_Spending / Total_Purchases, 0)
+  )
+```
+
+## 4. Segmentación por dependencia de descuento
+
+Para facilitar una lectura de negocio, transformamos la variable continua `Deals_Ratio` en tres segmentos: **bajo**, **medio** y **alto** uso de descuentos. La segmentación se realiza mediante terciles, de forma que los grupos queden equilibrados en tamaño y comparables entre sí.
+
+Este enfoque permite responder con mayor claridad a preguntas del tipo:
+
+-   ¿Los clientes con uso alto de descuentos gastan más o menos que el resto?
+-   ¿Su valor anualizado es competitivo o inferior?
+-   ¿Su ticket medio sugiere dependencia promocional de bajo valor?
+
+Finalmente, comprobamos el número de clientes por segmento para validar que la partición se ha realizado correctamente.
+
+```{r}
+q <- quantile(data$Deals_Ratio, probs = c(0, 1/3, 2/3, 1), na.rm = TRUE)
+
+data <- data %>%
+  mutate(
+    Discount_Segment = cut(
+      Deals_Ratio,
+      breaks = q,
+      include.lowest = TRUE,
+      labels = c("Bajo", "Medio", "Alto")
+    )
+  )
+
+data %>% count(Discount_Segment)
+```
+
+## 5. Análisis descriptivo inicial
+
+Una vez definidos los segmentos, realizamos un resumen comparativo por grupo para obtener una primera evidencia empírica.
+
+Las métricas incluidas cumplen funciones complementarias:
+
+-   `n`: tamaño muestral de cada segmento.
+-   `mean_spending` y `median_spending`: nivel de gasto total (la mediana aporta robustez ante valores extremos).
+-   `mean_value_annual`: valor anualizado promedio, ajustado por antigüedad.
+-   `mean_spend_per_purchase`: ticket medio, indicador de calidad económica de cada compra.
+
+Este bloque no establece causalidad, pero permite detectar patrones preliminares sobre si una mayor dependencia de descuentos se asocia con menor valor del cliente.
+
+```{r}
+data %>%
+  group_by(Discount_Segment) %>%
+  summarise(
+    n = n(),
+    mean_spending = mean(Total_Spending, na.rm = TRUE),
+    median_spending = median(Total_Spending, na.rm = TRUE),
+    mean_value_annual = mean(Value_Annual, na.rm = TRUE),
+    mean_spend_per_purchase = mean(Spend_Per_Purchase, na.rm = TRUE)
+  )
+```
+
+Los resultados descriptivos muestran un patrón consistente: a medida que aumenta la dependencia de descuentos (`Discount_Segment` de **Bajo** a **Alto**), disminuye de forma marcada el valor económico del cliente en todas las métricas analizadas. El grupo de uso bajo de descuentos concentra los mejores indicadores de gasto total, gasto anualizado y ticket medio, mientras que el grupo de uso alto presenta los niveles más reducidos.
+
+Esta evidencia sugiere que los clientes más promodependientes no solo gastan menos en términos agregados, sino que además generan compras de menor valor unitario. Desde una perspectiva de negocio, el resultado preliminar apunta a un posible efecto de “subvención” de clientes de bajo valor cuando la estrategia comercial se apoya intensamente en promociones.
+
+No obstante, al tratarse de un análisis descriptivo, estas conclusiones deben validarse en la siguiente fase mediante contrastes inferenciales y modelos con variables de control, con el fin de confirmar si la relación se mantiene tras ajustar por otros factores relevantes del comportamiento de compra.
+
