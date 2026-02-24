@@ -1,0 +1,433 @@
+---
+title: "CustomerLens-Analytics. P. Individual 1."
+author: "Pablo Oliva Muñoz"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+    toc_depth: 4
+    number_sections: true
+    theme: flatly
+    highlight: tango
+    code_folding: show
+---
+
+<style>
+body {
+  text-align: justify;
+}
+</style>
+---
+
+# La Estrategia Multicanal: ¿Más Canales = Más Compras?
+
+![](images/canal.png)
+
+## Introducción
+
+En el comercio que estamos estudiando, la empresa despliega múltiples puntos de contacto con el cliente: la **tienda física**, la **web** y el **catálogo**. Esta estrategia multicanal responde a la intuición de que cuanto más fácil sea comprar, más comprará el cliente. Pero, ¿es esto realmente así? ¿O el efecto se diluye porque los clientes simplemente redistribuyen sus compras entre canales sin aumentar el volumen total?
+
+Esta primera pregunta individual aborda precisamente esa cuestión:
+
+> **¿Aumenta el volumen de compras cuantos más canales utiliza el cliente?**
+
+Responder a esta pregunta tiene implicaciones directas en estrategia comercial: si los clientes multicanal compran más en términos absolutos, la empresa tiene un incentivo claro para incentivar la adopción de múltiples canales. Si no, quizás la inversión en omnicalidad no se justifica por volumen de compra.
+
+En este primer notebook, analizamos la pregunta desde un enfoque exploratorio y descriptivo, utilizando diversas herramientas de visualización para identificar patrones en los datos antes de formular conclusiones formales. El análisis estadístico y el contraste de hipótesis sobre el mecanismo de ese posible aumento (¿suma o sinergia?) se tratará en el **Notebook de Pregunta Individual 2**.
+
+### Objetivos {.unnumbered}
+
+1.  Describir la **distribución de clientes** según su perfil multicanal.
+2.  Identificar la estructura del **gasto total** en la base de clientes y los perfiles de valor existentes.
+3.  Analizar la **intensidad de compra** (volumen y gasto) por perfil multicanal.
+4.  Determinar si los canales adicionales **incrementan** o sustituyen compras existentes.
+5.  Evaluar si el efecto multicanal persiste al **controlar por ingresos**.
+
+------------------------------------------------------------------------
+
+## Preparación del Entorno y los Datos
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 10, fig.height = 6, fig.align = 'center')
+```
+
+```{r libraries}
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(forcats)
+library(ggpubr)  
+library(ggrepel)  
+```
+
+```{r load-data}
+# Cargamos el dataset ya preprocesado 
+data <- read_csv("./data/marketing_campaign_processed.csv", show_col_types = FALSE)
+
+data$Education <- factor(data$Education,
+                         levels = c("Basic", "2n Cycle", "Graduation", "Master", "PhD"),
+                         ordered = TRUE)
+data$Marital_Status <- factor(data$Marital_Status,
+                              levels = c("Single", "Together", "Married", "Divorced", "Widow"))
+
+data <- data %>%
+  mutate(
+    Income_Band = cut(Income,
+                      breaks = c(0, 30000, 50000, 75000, Inf),
+                      labels = c("Bajos (<30k)", "Medios (30k-50k)",
+                                 "Altos (50k-75k)", "Muy Altos (>75k)"),
+                      include.lowest = TRUE)
+  )
+```
+
+### Construcción de la variable `Num_Channels` {.unnumbered}
+
+La variable clave de este análisis es `Num_Channels`: cuántos de los tres canales disponibles ha utilizado el cliente de forma **activa** (al menos 1 compra en ese canal). Excluimos los clientes sin ninguna compra registrada.
+
+```{r build-num-channels}
+data <- data %>%
+  mutate(
+    Canal_Web     = as.integer(NumWebPurchases     > 0),
+    Canal_Catalog = as.integer(NumCatalogPurchases > 0),
+    Canal_Store   = as.integer(NumStorePurchases   > 0),
+    Num_Channels  = Canal_Web + Canal_Catalog + Canal_Store
+  ) %>%
+  filter(Num_Channels >= 1)
+
+data$Num_Channels_f <- factor(data$Num_Channels, levels = 1:3,
+                               labels = c("1 canal\n(Monocanal)",
+                                          "2 canales\n(Bicanal)",
+                                          "3 canales\n(Tricanal)"))
+
+# Resumen inicial
+data %>%
+  count(Num_Channels_f) %>%
+  mutate(Porcentaje = percent(n / sum(n), accuracy = 0.1)) %>%
+  rename(`Perfil` = Num_Channels_f, `Nº Clientes` = n, `% Total` = Porcentaje)
+```
+
+> **Nota metodológica:** La variable `Num_Channels` toma valores de 1 (monocanal) a 3 (tricanal, usa todos los canales disponibles simultáneamente).
+
+------------------------------------------------------------------------
+
+## Distribución: ¿Quiénes son nuestros clientes?
+
+***Objetivo 1:** Describir la distribución de clientes según su perfil multicanal.*
+
+Antes de analizar el impacto de los canales, entendemos la estructura base: ¿la clientela tiende hacia la monocanalidad o la multicanalidad? Combinamos el gráfico de barras de distribución con el histograma del volumen de compras por perfil.
+
+```{r plot-seccion1}
+dist_data <- data %>%
+  count(Num_Channels_f) %>%
+  mutate(pct = n / sum(n))
+
+p1 <- ggplot(dist_data, aes(x = Num_Channels_f, y = n, fill = Num_Channels_f)) +
+  geom_col(color = "white", width = 0.6, alpha = 0.9) +
+  geom_text(aes(label = paste0(n, "\n(", percent(pct, accuracy = 0.1), ")")),
+            vjust = -0.3, fontface = "bold", size = 4) +
+  scale_fill_manual(values = c("#74C2E1", "#2A9D8F", "#264653")) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.20))) +
+  labs(title    = "Distribución por Perfil Multicanal",
+       subtitle = "¿Cuántos clientes son mono, bi o tricanal?",
+       x = NULL, y = "Nº clientes") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"), legend.position = "none",
+        panel.grid.major.x = element_blank())
+
+p2 <- ggplot(data, aes(x = Total_Purchases, fill = Num_Channels_f)) +
+  geom_histogram(binwidth = 2, color = "white", alpha = 0.85) +
+  facet_wrap(~ Num_Channels_f, ncol = 1, scales = "free_y") +
+  scale_fill_manual(values = c("#74C2E1", "#2A9D8F", "#264653")) +
+  labs(title    = "Volumen de Compras por Perfil",
+       x = "Total de compras", y = "Frecuencia") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"), legend.position = "none",
+        strip.text = element_text(face = "bold", size = 9))
+
+ggarrange(p1, p2, ncol = 2, widths = c(1, 1.2))
+```
+
+> **Hallazgo:** La gran mayoría son **tricanales (≈73%)** — el comportamiento multicanal es la norma, no la excepción. El histograma lo deja claro: los monocanales se concentran por debajo de las 8 compras, mientras que los tricanales son el único perfil capaz de superar las 15–20 compras de forma sistemática.
+
+------------------------------------------------------------------------
+
+## El Gasto Total: ¿Dónde está el dinero?
+
+***Objetivo 2:** Identificar la estructura del gasto total en la base de clientes y los perfiles de valor existentes.*
+
+Aplicamos el "zoom" estadístico de la escala logarítmica para ver qué tipos de clientes coexisten realmente en la base de datos.
+
+```{r plot-seccion2}
+# 1. Gráfico Superior: Escala Normal
+hg1 <- ggplot(data, aes(x = Total_Spending)) +
+  geom_histogram(bins = 35, fill = "#E76F51", color = "white", alpha = 0.85) +
+  annotate("rect", xmin = 0, xmax = 300, ymin = 0, ymax = 450,
+           alpha = .1, fill = "black", linetype = "dashed") +
+  annotate("text", x = 400, y = 400,
+           label = "Gran masa\n(Gasto < 300€)", size = 4, fontface = "bold", hjust = 0) +
+  scale_x_continuous(labels = label_dollar(prefix = "", suffix = " €"),
+                     breaks = seq(0, 2500, by = 500), # Marcas claras cada 500
+                     guide = guide_axis(check.overlap = TRUE)) +
+  labs(title = "Escala Normal — Volumen real",
+       x = "Gasto total (€)", y = "Nº de clientes") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"))
+
+# 2. Gráfico Inferior: Escala Logarítmica 
+hg2 <- ggplot(data %>% filter(Total_Spending > 0), aes(x = Total_Spending)) +
+  geom_histogram(bins = 35, fill = "#264653", color = "white", alpha = 0.85) +
+  # Anotaciones
+  annotate("rect", xmin = 25, xmax = 160, ymin = 0, ymax = 120,
+           alpha = .1, fill = "#74C2E1", linetype = "dashed") +
+  annotate("text", x = 30, y = 135, label = "Perfil A: Ticket bajo",
+           size = 4, fontface = "bold", hjust = 0, color = "#1a6b7c") +
+  annotate("rect", xmin = 550, xmax = 2600, ymin = 0, ymax = 180,
+           alpha = .1, fill = "#E76F51", linetype = "dashed") +
+  annotate("text", x = 600, y = 195, label = "Perfil B: Segmento Premium",
+           size = 4, fontface = "bold", hjust = 0, color = "#b34c1a") +
+  # EJE X MEJORADO
+  scale_x_log10(
+    breaks = c(10, 50, 100, 500, 1000, 2500), 
+    labels = label_dollar(prefix = "", suffix = " €")
+  ) +
+  labs(title = "Escala Logarítmica — Zoom de perfiles",
+       x = "Gasto total (€)", y = "Nº de clientes") +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold"))
+
+# Combinar verticalmente
+ggarrange(hg1, hg2, ncol = 1, nrow = 2)
+```
+
+> **Hallazgo:** Sin la escala logarítmica, el **Perfil B (Premium)** sería casi invisible. En escala log descubrimos que no hay un "cliente promedio", sino dos motores distintos: el **Perfil A** (masa con ticket de 30–150€) y el **Perfil B** (segmento Premium de 600–2.500€). La siguiente sección confirma a cuál de los dos pertenecen mayoritariamente los tricanales.
+
+------------------------------------------------------------------------
+
+## Eficiencia Multicanal: ¿Es Real el Aumento?
+
+***Objetivo 3:** Analizar la intensidad de compra (volumen y gasto) por perfil multicanal.*
+
+Analizamos si los tricanales simplemente tienen más compras ocasionales o si representan un cambio estructural en el comportamiento del cliente. Combinamos el **violín** (que muestra la forma real de la distribución, como el histograma pero en vertical) con el **boxplot** del gasto total.
+
+```{r plot-seccion3}
+stats_g <- data %>%
+  group_by(Num_Channels_f) %>%
+  summarise(media = mean(Total_Purchases), .groups = "drop")
+
+p_violin <- ggplot(data, aes(x = Num_Channels_f, y = Total_Purchases, fill = Num_Channels_f)) +
+  geom_violin(trim = FALSE, alpha = 0.40, color = NA) +
+  geom_boxplot(width = 0.13, outlier.shape = 21, outlier.fill = "white",
+               outlier.size = 1.8, color = "gray30", alpha = 0.85) +
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 4, fill = "white", color = "gray20") +
+  geom_text(data = stats_g,
+            aes(x = Num_Channels_f, y = media + 1.5,
+                label = paste0("μ = ", round(media, 1))),
+            inherit.aes = FALSE, fontface = "bold", size = 3.8, color = "gray20") +
+  scale_fill_manual(values = c("#74C2E1", "#2A9D8F", "#264653")) +
+  labs(title    = "Intensidad de Compra",
+       x = NULL, y = "Total de compras") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"), legend.position = "none")
+
+# Boxplot de gasto con outliers etiquetados
+is_outlier <- function(x) {
+  x < quantile(x, 0.25) - 1.5 * IQR(x) | x > quantile(x, 0.75) + 1.5 * IQR(x)
+}
+
+outlier_data <- data %>%
+  group_by(Num_Channels_f) %>%
+  mutate(es_outlier = is_outlier(Total_Spending),
+         etiq = ifelse(es_outlier, paste0(round(Total_Spending, 0), "€"), "")) %>%
+  ungroup()
+
+p_box_gasto <- ggplot(outlier_data,
+                       aes(x = Num_Channels_f, y = Total_Spending, fill = Num_Channels_f)) +
+  stat_boxplot(geom = "errorbar", width = 0.3) +
+  geom_boxplot(outlier.shape = 21, outlier.fill = "white", outlier.size = 1.8,
+               alpha = 0.75, color = "gray30") +
+  geom_text_repel(aes(label = etiq), size = 2.6, color = "gray30",
+                  max.overlaps = 5, segment.color = "gray70") +
+  scale_fill_manual(values = c("#74C2E1", "#2A9D8F", "#264653")) +
+  scale_y_continuous(labels = dollar_format(prefix = "", suffix = " €")) +
+  labs(title    = "Consolidación del Gasto",
+       x = NULL, y = "Gasto total (€)") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold"), legend.position = "none")
+
+ggarrange(p_violin, p_box_gasto, ncol = 2)
+```
+
+> **Hallazgo 1 — Volumen:** Tricanal (μ = 15.4 compras). La multicanalidad "implica un comportamiento de compra de alta intensidad que simplemente no existe en los otros perfiles.\
+> **Hallazgo 2 — Gasto:** Los outliers del grupo tricanal (etiquetados en el boxplot) representan los clientes de mayor gasto absoluto de toda la base de datos. El gasto alto no es una rareza en este grupo, es la dirección en la que apunta la distribución.\
+> **Respuesta:** Los clientes tricanales pertenecen mayoritariamente al **Perfil B (Premium)**. Su distribución de gasto es la única que alcanza los valores superiores de 600–2.500€, mientras que los monocanales se concentran en el rango del Perfil A (.
+
+------------------------------------------------------------------------
+
+## El Mix de Canales: ¿Sustitución o Efecto incremental?
+
+***Objetivo 4:** Determinar si los canales adicionales incrementan o sustituyen compras existentes.*
+
+La clave para entender si estamos ante sinergia real o simple redistribución: ¿los tricanales compran más en cada canal individual, o han movido sus compras de un canal a otro?
+
+```{r plot-seccion4}
+# Heatmap de compras medias por canal y perfil
+heat_data <- data %>%
+  group_by(Num_Channels_f) %>%
+  summarise(Web      = mean(NumWebPurchases),
+            Catálogo = mean(NumCatalogPurchases),
+            Tienda   = mean(NumStorePurchases),
+            .groups  = "drop") %>%
+  pivot_longer(cols = -Num_Channels_f, names_to = "Canal", values_to = "Media")
+
+p_heat <- ggplot(heat_data, aes(x = Canal, y = fct_rev(Num_Channels_f), fill = Media)) +
+  geom_tile(color = "white", linewidth = 1.5) +
+  geom_text(aes(label = round(Media, 1)), fontface = "bold", size = 6, color = "white") +
+  scale_fill_gradient(low = "#B2E4F5", high = "#1A3A4A", name = "Compras\nmedias") +
+  labs(title    = "Mapa de Calor: Compras Medias por Canal y Perfil",
+       subtitle = "¿Cuántas compras hace de media un cliente de cada perfil en cada canal?",
+       x = NULL, y = NULL) +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold", size = 14), panel.grid = element_blank())
+
+# Faceted boxplot por canal: distribución detallada
+data_long <- data %>%
+  select(Num_Channels_f, NumWebPurchases, NumCatalogPurchases, NumStorePurchases) %>%
+  pivot_longer(cols = -Num_Channels_f, names_to = "Canal", values_to = "Compras") %>%
+  mutate(Canal = recode(Canal,
+                        "NumWebPurchases"     = "Web",
+                        "NumCatalogPurchases" = "Catálogo",
+                        "NumStorePurchases"   = "Tienda"))
+
+p_facet_canal <- ggplot(data_long, aes(x = Num_Channels_f, y = Compras, fill = Num_Channels_f)) +
+  geom_boxplot(outlier.shape = 21, outlier.fill = "white", outlier.size = 1.2,
+               alpha = 0.75, color = "gray30") +
+  facet_wrap(~ Canal, ncol = 3) +
+  scale_fill_manual(values = c("#74C2E1", "#2A9D8F", "#264653")) +
+  labs(title    = "Distribución por Canal según Perfil Multicanal",
+       subtitle = "Faceta por canal — ¿el uso de canales adicionales canibaliza la tienda?",
+       x = NULL, y = "Compras en ese canal") +
+  theme_minimal(base_size = 11) +
+  theme(plot.title = element_text(face = "bold"), legend.position = "none",
+        strip.text = element_text(face = "bold", size = 11),
+        axis.text.x = element_text(size = 8))
+
+
+ggarrange(p_heat, p_facet_canal, nrow = 2, heights = c(1, 1.1))
+```
+
+> **Hallazgo clave — No hay efecto sustitución, hay un efecto acumulativo.**
+>
+> En el mapa de calor se aprecia que, a medida que aumenta el número de canales utilizados, crece el promedio de compras en todos los canales. Por ejemplo, en tienda los clientes tricanal registran **6.8 compras de media**, frente a **2.3 en monocanal** y **3.0 en bicanal**.
+>
+> Esto indica que los clientes multicanal no están trasladando sus compras de la tienda hacia la web o el catálogo, sino que están sumando compras adicionales en los otros canales manteniendo —e incluso aumentando— su actividad en tienda.
+>
+> Los boxplots del panel inferior refuerzan esta conclusión: la mediana de compras en cada canal aumenta de forma consistente al pasar de clientes monocanal a bicanal y, posteriormente, a tricanal. En conjunto, todo indica que los canales extra tienen un efecto incremental sobre el cliente.
+
+------------------------------------------------------------------------
+
+## El Factor Ingresos: ¿Es Solo Porque Son Más Ricos?
+
+***Objetivo 5:** Evaluar si el efecto multicanal persiste al controlar por ingresos.*
+
+Una hipótesis alternativa plausible es que los clientes tricanales simplemente tienen más dinero, y comprarían más igualmente con independencia del número de canales que usan. Para responder usamos un **gráfico de líneas** que permite visualizar la tendencia del gasto medio al aumentar los canales dentro de cada tramo de ingresos.
+
+```{r plot-seccion5}
+line_data <- data %>%
+  filter(!is.na(Income_Band)) %>%
+  group_by(Income_Band, Num_Channels) %>%
+  summarise(Media_Gasto   = mean(Total_Spending),
+            Media_Compras = mean(Total_Purchases),
+            n             = n(),
+            .groups = "drop")
+
+p_linea <- ggplot(line_data, aes(x = Num_Channels, y = Media_Gasto,
+                                  color = Income_Band, group = Income_Band)) +
+  geom_line(linewidth = 1.3) +
+  geom_point(aes(size = n), alpha = 0.9) +
+  geom_text(aes(label = dollar(Media_Gasto, prefix = "", suffix = "€", accuracy = 1)),
+            vjust = -1.1, size = 3, fontface = "bold", show.legend = FALSE) +
+  scale_color_brewer(palette = "Blues", direction = 1, name = "Nivel de\ningresos") +
+  scale_size_continuous(name = "Nº clientes", range = c(3, 7), guide = "none") +
+  scale_x_continuous(breaks = 1:3, labels = c("Mono\n(1 canal)", "Bi\n(2 canales)", "Tri\n(3 canales)")) +
+  scale_y_continuous(labels = dollar_format(prefix = "", suffix = " €"),
+                     expand = expansion(mult = c(0.05, 0.15))) +
+  labs(
+    title    = "Gasto Medio según Ingresos y Número de Canales Activos",
+    x        = "Nº de canales activos",
+    y        = "Gasto medio (€)",
+    caption  = "El tamaño del punto indica el volumen de clientes en ese grupo"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(plot.title    = element_text(face = "bold", size = 15),
+        plot.subtitle = element_text(color = "gray40"),
+        plot.caption  = element_text(color = "gray60", face = "italic"),
+        legend.position = "right")
+
+p_linea
+```
+
+> **Hallazgo final:** El efecto multicanal es **robusto en todos los segmentos de renta**.
+>
+> El gasto medio aumenta al añadir canales en todos los tramos de renta. Aunque quienes tienen mayores ingresos gastan más en términos absolutos, el incremento asociado al uso de más canales se repite en todos los grupos.
+>
+> Por tanto, el efecto multicanal no es solo una cuestión de mayor poder adquisitivo, sino un patrón de compra que se activa al operar en más canales.
+
+------------------------------------------------------------------------
+
+## Resumen y Tabla de Métricas Finales
+
+```{r tabla-resumen}
+tabla_resumen <- summarise(
+  group_by(data, `Perfil multicanal` = Num_Channels_f),
+  `Nº clientes`        = n(),
+  `% del total`        = percent(n() / nrow(data), accuracy = 0.1),
+  `Media compras`      = round(mean(Total_Purchases), 1),
+  `Mediana compras`    = round(median(Total_Purchases), 1),
+  `Media gasto (€)`    = round(mean(Total_Spending), 0),
+  `Mediana gasto (€)`  = round(median(Total_Spending), 0),
+  `Media ingresos (€)` = round(mean(Income, na.rm = TRUE), 0),
+  .groups              = "drop"
+)
+
+tabla_resumen
+```
+
+## Conclusiones
+
+### Respuesta a la pregunta de investigación
+
+> > **¿Aumenta el volumen de compras cuantos más canales utiliza el cliente?**
+>
+> La respuesta está clara: **sí, usar más canales se correlaciona de forma robusta con más compras y más gasto**. Y el efecto no es proporcional — la relación es progresiva y no lineal, lo que ya apunta a que existe algo más que una simple suma. Pero la naturaleza exacta de ese «algo más» (¿sinergia o suma?) queda como pregunta abierta para el **Notebook 4**.
+
+### Síntesis por objetivos {.unnumbered}
+
+| Objetivo | Resultado |
+|------------------------------------|------------------------------------|
+| 1\. Perfil multicanal de la clientela | **≈73% son tricanales** — la multicanalidad es la norma, no la excepción |
+| 2\. Estructura del gasto total | Dos perfiles coexisten: **Perfil A** (masa, ticket bajo) y **Perfil B** (Premium, 600–2.500€) |
+| 3\. ¿Es real el aumento de gasto? | **Sí** — mediana e IQR crecen sistemáticamente de Mono a Tricanal |
+| 4\. ¿Sustitución o adición de canales? | **Incrementa**l — los tricanales compran más en **cada canal** por separado (heatmap) |
+| 5\. ¿Es solo por ingresos? | **No** — el patrón se mantiene en todos los tramos de renta; los ingresos influyen en el nivel de gasto, pero el canal opera por encima de esa influencia |
+
+### Implicaciones para el negocio {.unnumbered}
+
+**1. La multicanalidad es el comportamiento mayoritario, no marginal**
+
+Con un 73% de clientes tricanales, el diseño de la experiencia de cliente debe tomar la multicanalidad como punto de partida, no como caso especial.
+
+**2. Los dos perfiles de valor requieren estrategias diferenciadas**
+
+El Perfil A (masa) y el Perfil B (Premium) coexisten y ambos se potencian con la multicanalidad. Una estrategia única no captura el valor potencial de ninguno de los dos.
+
+**3. Activar canales adicionales no canibaliza: suma**
+
+Cada canal adicional añade compras por encima de los canales previos. Esto sugiere que los programas de activación cruzada tienen un potencial, al menos en términos de comportamiento de compra.
+
+> **Pregunta abierta para el Notebook 4:** ¿Ese aumento de gasto es una simple suma de ventas independientes, o existe un efecto multiplicador (sinergias) al combinar canales?
+
+------------------------------------------------------------------------

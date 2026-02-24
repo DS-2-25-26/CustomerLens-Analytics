@@ -1,0 +1,409 @@
+---
+title: "CustomerLens-Analytics. P. Individual 2."
+author: "Pablo Oliva Muñoz"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+    toc_depth: 4
+    number_sections: true
+    theme: flatly
+    highlight: tango
+    code_folding: show
+---
+
+```{=html}
+<style>
+body {
+  text-align: justify;
+}
+</style>
+```
+
+------------------------------------------------------------------------
+
+# La Estrategia Multicanal: ¿Suma o Sinergia?
+
+![](images/canal_2.jpeg)
+
+## Introducción
+
+En el Notebook de Pregunta Individual 1 demostramos exploratoriamente que los clientes que utilizan más canales de compra acumulan un mayor volumen de compras y un mayor gasto total. Sin embargo, una pregunta más profunda y estratégicamente más relevante permanecía abierta:
+
+> **¿Ese aumento de gasto es una simple suma de ventas independientes, o existe un efecto multiplicador (sinergias) al combinar canales?**
+
+La diferencia entre ambas hipótesis tiene implicaciones de negocio completamente distintas:
+
+-   Si los canales son **independientes y aditivos**, cada uno aporta su contribución propia al gasto total y la empresa debería optimizar cada canal por separado según su ROI individual.
+-   Si existen **sinergias** (efecto multiplicador), la combinación de canales genera un gasto extra que va más allá de la suma de sus partes. En ese caso, la empresa debería priorizar estrategias que incentiven el uso simultáneo de múltiples canales.
+
+Para responder necesitamos ir más allá de la exploración visual: aplicaremos el **análisis de la varianza (ANOVA)** para confirmar que las diferencias son reales, y modelos de **regresión con términos de interacción** para detectar si esas sinergias existen matemáticamente.
+
+### Objetivos {.unnumbered}
+
+1.  Confirmar estadísticamente que el gasto difiere según el número de canales activos (ANOVA).
+2.  Modelizar el gasto total como una **suma aditiva** de los distintos canales, bajo la hipótesis de ausencia de sinergia.
+3.  Extender el modelo incluyendo **interacciones** entre canales para evaluar la presencia de un efecto multiplicador en el gasto.
+4.  Comparar el gasto predicho en todas las combinaciones posibles de canales.
+
+------------------------------------------------------------------------
+
+## Preparación del Entorno y los Datos
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 10, fig.height = 6, fig.align = 'center')
+```
+
+```{r libraries}
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(ggpubr)   
+library(broom)    
+library(car)      
+```
+
+```{r load-and-prepare}
+data <- read_csv("./data/marketing_campaign_processed.csv", show_col_types = FALSE)
+
+data$Education      <- factor(data$Education,
+                              levels = c("Basic","2n Cycle","Graduation","Master","PhD"),
+                              ordered = TRUE)
+data$Marital_Status <- factor(data$Marital_Status,
+                              levels = c("Single","Together","Married","Divorced","Widow"))
+
+# Reconstruimos Num_Channels 
+data <- data %>%
+  mutate(
+    Canal_Web     = as.integer(NumWebPurchases     > 0),
+    Canal_Catalog = as.integer(NumCatalogPurchases > 0),
+    Canal_Store   = as.integer(NumStorePurchases   > 0),
+    Num_Channels  = Canal_Web + Canal_Catalog + Canal_Store
+  ) %>%
+  filter(Num_Channels >= 1)
+
+data$Num_Channels_f <- factor(data$Num_Channels, levels = 1:3,
+                               labels = c("1 canal", "2 canales", "3 canales"))
+
+cat("Observaciones disponibles:", nrow(data), "\n")
+table(data$Num_Channels_f)
+
+# Aseguramos que Income no tenga NAs 
+data <- data %>% filter(!is.na(Income))
+cat("Observaciones tras eliminar Income NA:", nrow(data), "\n")
+```
+
+------------------------------------------------------------------------
+
+## ANOVA: ¿Es Real la Diferencia entre Grupos?
+
+***Objetivo 1:** Confirmar estadísticamente que el gasto difiere según el número de canales activos.*
+
+Antes de buscar sinergias, necesitamos descartar que las diferencias observadas en el Notebook anterior sean fruto del azar. Si los grupos no difieren estadísticamente, no tiene sentido buscar un efecto multiplicador.
+
+### Verificación de homocedasticidad — Test de Levene {.unnumbered}
+
+El ANOVA clásico asume que la varianza del gasto es igual en los tres grupos (monocanal, bicanal, tricanal). Verificamos esta premisa con el **Test de Levene** antes de elegir la variante de ANOVA más adecuada.
+
+```{r levene}
+# Test de Levene: H0 = varianzas iguales entre grupos
+levene_result <- leveneTest(Total_Spending ~ Num_Channels_f, data = data)
+print(levene_result)
+
+if (levene_result$`Pr(>F)`[1] < 0.05) {
+  cat("\nConclusión: varianzas DESIGUALES entre grupos (p < 0.05).\n")
+  cat("-> Se usará el ANOVA de Welch, robusto ante heterocedasticidad.\n")
+} else {
+  cat("\nConclusión: varianzas homogéneas (p >= 0.05). ANOVA clásico sería válido.\n")
+}
+```
+
+> **Hallazgo-** El test de Levene para homogeneidad de varianzas resultó significativo (F = 562.5, p \< 2.2e-16).
+>
+> Esto indica que las varianzas entre grupos son desiguales. Esto es consistente con lo esperado en variables de gasto económico, que suelen mostrar distribuciones asimétricas y varianzas crecientes a medida que aumenta la media, como ocurre en datos multicanal donde los consumidores tricanal presentan un rango de gasto mucho mayor. En este contexto, el ANOVA de Welch (var.equal = FALSE) constituye la opción estadísticamente adecuada.
+
+### ANOVA de Welch {.unnumbered}
+
+```{r anova}
+# ANOVA de Welch: robusto ante varianzas desiguales entre grupos
+anova_welch <- oneway.test(Total_Spending ~ Num_Channels_f, data = data, var.equal = FALSE)
+anova_welch
+```
+
+```{r plot-anova}
+# Gráfico de medias con intervalos de confianza y puntos individuales
+ggline(data, x = "Num_Channels_f", y = "Total_Spending",
+       add        = c("mean_ci", "jitter"),
+       color      = "Num_Channels_f",
+       palette    = c("#74C2E1", "#2A9D8F", "#264653"),
+       point.size = 0.5,
+       alpha      = 0.3,
+       title      = "Comparación del Gasto Medio por Perfil Multicanal",
+       subtitle   = paste("ANOVA de Welch — p-valor:", format.pval(anova_welch$p.value, digits = 3)),
+       xlab       = "Perfil de canales",
+       ylab       = "Gasto total (€)") +
+  scale_y_continuous(labels = dollar_format(prefix = "", suffix = " €")) +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold", size = 15),
+        legend.position = "none")
+```
+
+```{r post-hoc}
+
+post_hoc <- pairwise.t.test(data$Total_Spending, data$Num_Channels_f,
+                            p.adjust.method = "bonferroni", 
+                            pool.sd = FALSE) 
+
+print("p-valores ajustados por Bonferroni (Varianzas desiguales):")
+print(post_hoc$p.value)
+```
+
+> **Hallazgo — Objetivo 1 resuelto:** El p-valor del ANOVA de Welch es prácticamente cero (2.2e-16), lo que descarta que las diferencias de gasto sean casuales.
+>
+> Los clientes que usan los 3 canales gastan muchísimo más que el resto. Sin embargo, los datos no muestran una diferencia real de gasto entre usar 1 o 2 canales (probablemente porque tenemos muy pocos clientes monocanal para comparar bien). Pero lo que realmente importa para el negocio es que **el gran salto de dinero ocurre al pasar de 2 a 3 canales**.
+>
+> Sabiendo que usar los tres canales dispara el gasto, la gran pregunta que nos queda es: ¿ese subidón es solo la suma normal de lo que gastarían en cada sitio por separado, o existe un efecto multiplicador al combinarlos?
+
+------------------------------------------------------------------------
+
+## Modelización: Buscando el "Efecto Sinerga"
+
+***Objetivos 2-3:** Comparar modelos de gasto para identificar posibles efectos multiplicadores entre canales.*
+
+Construimos tres modelos de forma progresiva, cada uno respondiendo a una pregunta diferente:
+
+| Modelo | Pregunta que responde | Formulación R |
+|------------------------|------------------------|------------------------|
+| **Modelo 1 — Suma** | ¿Cada canal contribuye de forma independiente? | `~Web + Catálogo + Tienda` |
+| **Modelo 2 — Sinergia** | ¿Los canales se potencian entre sí? | `~(Web + Catálogo + Tienda)^3` |
+| **Modelo 3 — Controlado** | ¿La sinergia persiste al aislar el efecto de los ingresos? | `~(Web + Catálogo + Tienda)^3 + Income` |
+
+El tercer modelo introduce `Income` como variable de control. La motivación viene del Notebook anterior, donde observamos que los clientes tricanales también tienen ingresos más altos. Para descartar que la sinergia detectada sea simplemente un reflejo de mayor capacidad adquisitiva, controlamos por ingresos y comprobamos si el efecto se mantiene.
+
+### Paso 1: ¿Los canales son independientes? {.unnumbered}
+
+```{r modelos}
+# Modelo 1: Efectos aditivos — H0: los canales son independientes
+mod_suma <- lm(
+  Total_Spending ~ NumWebPurchases + NumCatalogPurchases + NumStorePurchases,
+  data = data
+)
+
+# Modelo 2: Interacciones ^3 — incluye pares Y el trío Web×Catálogo×Tienda
+mod_sinergia <- lm(
+  Total_Spending ~ (NumWebPurchases + NumCatalogPurchases + NumStorePurchases)^3,
+  data = data
+)
+
+# Modelo 3: Igual que Modelo 2 pero controlando por ingresos del cliente
+mod_controlado <- lm(
+  Total_Spending ~ (NumWebPurchases + NumCatalogPurchases + NumStorePurchases)^3 + Income,
+  data = data
+)
+
+# --- ¿Añadir interacciones mejora el modelo? (Paso 1 vs Paso 2) ---
+r2_suma      <- round(summary(mod_suma)$adj.r.squared * 100, 2)
+r2_sinergia  <- round(summary(mod_sinergia)$adj.r.squared * 100, 2)
+r2_control   <- round(summary(mod_controlado)$adj.r.squared * 100, 2)
+
+cat("=== Comparacion de R2 ajustados ===\n")
+cat("Modelo 1 — Suma       :", r2_suma, "%\n")
+cat("Modelo 2 — Sinergia   :", r2_sinergia, "%\n")
+cat("Modelo 3 — Controlado :", r2_control, "%\n\n")
+
+# F-test: Modelo 1 vs Modelo 2 (¿aportan algo las interacciones?)
+ftest12 <- anova(mod_suma, mod_sinergia)
+cat("=== F-test Modelo 1 vs Modelo 2 ===\n")
+cat("F =", round(ftest12$F[2], 3), "| p-valor =",
+    format.pval(ftest12$`Pr(>F)`[2], digits = 4, eps = 1e-16), "\n")
+if (ftest12$`Pr(>F)`[2] < 0.05) {
+  cat("-> SI: las interacciones entre canales mejoran significativamente el modelo\n")
+} else {
+  cat("-> NO: los canales actuan de forma independiente\n")
+}
+
+# F-test: Modelo 2 vs Modelo 3 (¿Income explica algo adicional?)
+ftest23 <- anova(mod_sinergia, mod_controlado)
+cat("\n=== F-test Modelo 2 vs Modelo 3 ===\n")
+cat("F =", round(ftest23$F[2], 3), "| p-valor =",
+    format.pval(ftest23$`Pr(>F)`[2], digits = 4, eps = 1e-16), "\n")
+if (ftest23$`Pr(>F)`[2] < 0.05) {
+  cat("-> Income aporta poder explicativo adicional al modelo\n")
+  cat("-> Si las interacciones siguen siendo significativas en Modelo 3,\n")
+  cat("   la sinergia es REAL e independiente del nivel de ingresos\n")
+} else {
+  cat("-> Income NO aporta poder explicativo adicional (p >= 0.05)\n")
+  cat("-> El Modelo 2 ya captura toda la variacion relevante\n")
+}
+```
+
+### Paso 2: ¿La sinergia es real o la explican los ingresos? {.unnumbered}
+
+```{r coef-sinergia}
+tidy(mod_sinergia) %>%
+  filter(p.value < 0.05) %>%
+  arrange(p.value) %>%
+  mutate(
+    Significativo = case_when(p.value < 0.001 ~ "***", p.value < 0.01 ~ "**",
+                              p.value < 0.05  ~ "*",  TRUE ~ ""),
+    across(c(estimate, std.error, statistic), ~ round(., 3))
+  ) %>%
+  rename(Término = term, `Efecto (€)` = estimate,
+         `Error Std.` = std.error, `t-valor` = statistic, `p-valor` = p.value)
+```
+
+```{r coef-controlado}
+tidy(mod_controlado) %>%
+  filter(p.value < 0.05) %>%
+  arrange(p.value) %>%
+  mutate(
+    Significativo = case_when(p.value < 0.001 ~ "***", p.value < 0.01 ~ "**",
+                              p.value < 0.05  ~ "*",  TRUE ~ ""),
+    across(c(estimate, std.error, statistic), ~ round(., 3))
+  ) %>%
+  rename(Término = term, `Efecto (€)` = estimate,
+         `Error Std.` = std.error, `t-valor` = statistic, `p-valor` = p.value)
+```
+
+> **Hallazgo — Objetivos 2, 3 resueltos:** Los tres modelos mejoran progresivamente el ajuste: R² ajustado del 72,6 % (Modelo 1), al 74,17 % (Modelo 2) al **76,15 % (Modelo 3)**
+>
+> Las interacciones entre pares de canales son positivas y significativas — **Web × Catálogo (+15–16 €)**, Catálogo × Tienda (+4–5 €), Web × Tienda (+2–3 €) — lo que confirma la existencia de efectos multiplicadores. La interacción triple presenta una saturación leve (–2 €): el valor incremental de combinar los tres canales viene principalmente de los pares, aunque el cliente tricanal sigue acumulando todas las sinergias simultáneamente, lo que lo convierte en el **perfil de mayor gasto predicho.**
+>
+> Controlando por ingresos (Modelo 3), las interacciones siguen siendo significativas: la sinergia es un comportamiento real de los clientes, no solo un efecto del nivel de renta. El Modelo 3 es la referencia analítica del resto del notebook. **En otras palabras, el ingreso marca el gasto base de cada cliente, y la combinación de canales añade valor extra por encima de ese nivel.**
+
+------------------------------------------------------------------------
+
+## Visualización de la Sinergia: El Gráfico Clave
+
+***Objetivo 4**: Comparar el gasto predicho en todas las combinaciones posibles de canales.*
+
+El gráfico que responde directamente la pregunta de investigación: usando el **Modelo 3 — Controlado** (el mejor), calculamos el gasto predicho para cada **perfil de canal posible**.
+
+```{r plot-perfiles, fig.height=6, fig.width=11}
+
+WEB_TIPICO     <- 5   # compras web activas
+CAT_TIPICO     <- 3   # compras catálogo activas
+TIENDA_TIPICA  <- 7   # compras tienda activas
+INCOME_MED     <- median(data$Income, na.rm = TRUE)
+
+# 8 perfiles: todas las combinaciones posibles de activar/desactivar cada canal
+perfiles <- data.frame(
+  NumWebPurchases     = c(0, WEB_TIPICO, 0,         0,            WEB_TIPICO, WEB_TIPICO, 0,           WEB_TIPICO),
+  NumCatalogPurchases = c(0, 0,          CAT_TIPICO, 0,            CAT_TIPICO, 0,          CAT_TIPICO,  CAT_TIPICO),
+  NumStorePurchases   = c(0, 0,          0,          TIENDA_TIPICA, 0,          TIENDA_TIPICA, TIENDA_TIPICA, TIENDA_TIPICA),
+  Income              = INCOME_MED
+)
+perfiles$Pred <- predict(mod_controlado, newdata = perfiles)
+
+perfiles <- perfiles %>%
+  mutate(
+    Perfil = c("Sin canales",
+               "Solo Web", "Solo Catálogo", "Solo Tienda",
+               "Web + Catálogo", "Web + Tienda", "Catálogo + Tienda",
+               "Los Tres\n(Tricanal)"),
+    N_canales = c(0, 1, 1, 1, 2, 2, 2, 3),
+    Color_group = factor(N_canales,
+                         labels = c("Ninguno", "1 canal", "2 canales", "3 canales"))
+  ) %>%
+  # Ordenar por número de canales para que quede narrativo
+  mutate(Perfil = factor(Perfil, levels = Perfil))
+
+ggplot(perfiles, aes(x = Perfil, y = Pred, fill = Color_group)) +
+  geom_col(width = 0.65, color = "white", linewidth = 0.5, alpha = 0.92) +
+  geom_text(aes(label = paste0(round(Pred, 0), " €")),
+            vjust = -0.5, fontface = "bold", size = 3.8) +
+  scale_fill_manual(
+    values = c("Ninguno"   = "#D9D9D9",
+               "1 canal"   = "#74C2E1",
+               "2 canales" = "#2A9D8F",
+               "3 canales" = "#264653"),
+    name = "Perfil multicanal"
+  ) +
+  scale_y_continuous(labels = dollar_format(prefix = "", suffix = " €"),
+                     expand = expansion(mult = c(0, 0.12))) +
+  labs(
+    title    = "Gasto Predicho por Perfil de Canal: El Efecto Multiplicador",
+    subtitle = paste0("Modelo 3 (controlado por ingresos)"),
+    x        = NULL,
+    y        = "Gasto total predicho (€)",
+    caption  = "Modelo: Total_Spending ~ (Web + Catálogo + Tienda)³ + Income"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title    = element_text(face = "bold", size = 14),
+    plot.subtitle = element_text(color = "gray40", size = 9),
+    plot.caption  = element_text(color = "gray60", face = "italic"),
+    axis.text.x   = element_text(face = "bold", size = 10),
+    legend.position = "top"
+  )
+```
+
+> **Hallazgo — Objetivo 4 resuelto:** El gráfico responde de forma directa: el perfil **"Los Tres (Tricanal)"** genera un gasto predicho notablemente superior no solo a cualquier perfil monocanal, sino también a cualquier perfil bicanal. Si los canales fuesen puramente aditivos, "Los Tres" debería valer exactamente la suma de "Solo Web" + "Solo Catálogo" + "Solo Tienda". Que supere esa suma es la definición exacta de **sinergia**: el valor de la combinación excede la suma de las partes.
+
+------------------------------------------------------------------------
+
+## Comparativa Final de Modelos
+
+```{r tabla-modelos}
+data.frame(
+  Modelo        = c("Modelo 1 — Suma (aditivo)",
+                    "Modelo 2 — Sinergia (interacciones)",
+                    "Modelo 3 — Controlado (sinergia + Income)"),
+  `R²`          = c(round(summary(mod_suma)$r.squared, 4),
+                     round(summary(mod_sinergia)$r.squared, 4),
+                     round(summary(mod_controlado)$r.squared, 4)),
+  `R² ajustado` = c(round(summary(mod_suma)$adj.r.squared, 4),
+                     round(summary(mod_sinergia)$adj.r.squared, 4),
+                     round(summary(mod_controlado)$adj.r.squared, 4)),
+  AIC           = c(round(AIC(mod_suma), 0),
+                    round(AIC(mod_sinergia), 0),
+                    round(AIC(mod_controlado), 0)),
+  RMSE          = c(round(sqrt(mean(resid(mod_suma)^2)), 1),
+                    round(sqrt(mean(resid(mod_sinergia)^2)), 1),
+                    round(sqrt(mean(resid(mod_controlado)^2)), 1)),
+  check.names   = FALSE
+)
+```
+
+> **Interpretación:** La progresión de los tres modelos es la conclusión cuantitativa del análisis. Cada fila de la tabla debe leerse como una respuesta a una pregunta: el **Modelo 1** establece cuánto explican los canales por separado; el **Modelo 2** añade cómo interaccionan entre sí — si su AIC baja y su R² ajustado sube respecto al Modelo 1, existe sinergia real; el **Modelo 3** demuestra si esa sinergia sobrevive al quitar el posible efecto confusor de los ingresos. RMSE más bajo significa mejor predicción del gasto real en euros.
+
+------------------------------------------------------------------------
+
+## Conclusiones
+
+### Respuesta a la pregunta de investigación {.unnumbered}
+
+> **¿Ese aumento de gasto es una simple suma de ventas independientes, o existe un efecto multiplicador (sinergias) al combinar canales?**
+>
+> La respuesta es clara: **existe un efecto multiplicador real.** El aumento de gasto al combinar canales no se explica como una suma de contribuciones independientes. Las combinaciones generan gasto extra por encima de lo que cada canal aportaría por separado, y ese efecto persiste incluso entre clientes del mismo nivel de ingresos.
+
+### Síntesis por objetivos {.unnumbered}
+
+| Objetivo | Resultado |
+|----------------------------------|--------------------------------------|
+| 1\. Confirmar estadísticamente que el gasto difiere según el número de canales (ANOVA) | **Sí** — ANOVA de Welch (p ≈ 0); Bonferroni confirma tricanal vs resto (p \< 1e‑9); 1 vs 2 canales no significativo (n = 38) |
+| 2\. Modelizar el gasto como suma aditiva (hipótesis: sin sinergia) | R² ajustado = 72,6 % — captura el efecto individual de cada canal, pero infraestima el efecto combinado |
+| 3\. Extender el modelo con interacciones para evaluar el efecto multiplicador | R² ajustado sube a 74,17 % (76,15 % controlando ingresos); F-test significativo (p \< 1e‑16) — sinergia real e independiente del nivel de renta |
+| 4\. Comparar el gasto predicho en todas las combinaciones de canales | El perfil tricanal es el de mayor gasto predicho — acumula todas las sinergias de pares; usar los tres canales es la combinación óptima |
+
+### Implicaciones para el negocio {.unnumbered}
+
+**1. La multicanalidad no es redistribución de ventas, es creación de valor nuevo**
+
+Cada canal adicional no solo aporta sus propias ventas, potencia las de los canales que el cliente ya utilizaba. La empresa está ante un mecanismo de creación de valor, no de redistribución.
+
+**2. La palanca real está en los 543 clientes bicanales**
+
+El 73,6 % de la base ya es tricanal (1.622 clientes), ese valor ya está capturado. Los únicos 38 monocanales representan una oportunidad marginal. La palanca más rentable son los **543 clientes bicanales (24,7 %)**. Cada uno que añade un tercer canal activa sinergias que multiplican el valor de sus compras ya existentes. Una campaña de activación del tercer canal sobre este segmento tiene el mayor potencial de toda la base de clientes.
+
+**3. El perfil de máximo valor: tricanal con renta alta**
+
+De los 1.622 tricanales, los de renta alta son el subgrupo de mayor valor absoluto: no solo gastan más por su capacidad adquisitiva, sino que al utilizar los tres canales simultáneamente acumulan todas las sinergias de pares detectadas por el Modelo 3. La captación y fidelización de este perfil debería ser la prioridad estratégica de cualquier campaña orientada a maximizar el valor de vida del cliente.
+
+------------------------------------------------------------------------
+
+*Este notebook cierra el ciclo analítico del Notebook de Pregunta Individual 1. Juntos responden de forma completa a la pregunta sobre el papel de los canales de compra en el comportamiento del cliente.*
