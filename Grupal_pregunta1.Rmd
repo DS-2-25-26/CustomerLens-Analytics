@@ -9,7 +9,7 @@ output:
     # number_sections: true
 ---
 
-# Pregunta 1: ¿Hay relación entre la estructura familiar del cliente y su patrón de consumo?
+# Dime con quién vives y te diré qué compras
 
 ## Contextualización y motivación
 
