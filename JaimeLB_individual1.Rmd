@@ -9,7 +9,7 @@ output:
     # number_sections: true
 ---
 
-# La guerra de los canales: El cliente contraataca
+# La guerra de los canales: El cliente contraataca, ¿o quizás no?
 
 ## 1. Introducción
 
@@ -51,110 +51,645 @@ Para abordar la pregunta de investigación, es necesario caracterizar formalment
 
 Dado que el dataset no contiene directamente una variable categórica que identifique el *canal principal* del cliente, será necesario construir variables derivadas que permitan analizar la relación desde una perspectiva categórica y también desde una perspectiva probabilística.
 
-```{r}
+### 2.2. Enfoque analítico
 
+La pregunta de investigación puede reformularse estadísticamente de la siguiente manera:
+
+> ¿Son independientes el comportamiento de compra por canal y la probabilidad de que un cliente presente una queja?
+
+Para responderla, se adoptarán dos enfoques complementarios:
+
+#### Enfoque de asociación entre variables categóricas
+
+Se definirá una variable categórica que represente el **canal principal de compra** del cliente. A partir de ella, se construirá una tabla de contingencia entre:
+
+-   Canal principal
+-   Presentación de queja (`Complain`)
+
+Sobre dicha tabla se aplicará el **contraste χ² de independencia**, cuyas hipótesis son:
+
+-   **H₀ (Hipótesis nula)**: El canal de compra y la presentación de quejas son variables independientes.
+-   **H₁ (Hipótesis alternativa)**: Existe asociación entre el canal de compra y la presentación de quejas.
+
+El contraste se evaluará al nivel de significación habitual del 5%. Además, se calculará el **tamaño del efecto mediante el estadístico de Cramér (Cramér’s V)**, con el fin de cuantificar la intensidad de la asociación, ya que la significación estadística no implica necesariamente relevancia práctica.
+
+#### Enfoque de modelización probabilística
+
+Como complemento al análisis anterior, se empleará un modelo de **regresión logística binaria**, donde:
+
+-   Variable dependiente: `Complain`
+-   Variables explicativas: número de compras por canal
+
+Este modelo permitirá estimar cómo varía la **probabilidad de presentar una queja** en función del uso de cada canal, cuantificando el efecto mediante **odds ratios**.
+
+De esta forma, no solo se evaluará la existencia de relación, sino también su dirección e impacto relativo.
+
+## 3. Importación de librerías y carga de los datos
+
+En esta sección se importan las librerías necesarias para el análisis y se carga el dataset que será utilizado en el estudio. Es importante señalar que los datos empleados en este notebook **ya han sido previamente limpiados y procesados** en el notebook de preprocesamiento. Por tanto, en este análisis partimos de un dataset preparado y listo para el estudio estadístico e inferencial.
+
+Se utilizarán principalmente las librerías empleadas a lo largo de la asignatura para manipulación de datos, visualización y análisis estadístico.
+
+```{r}
+library(tidyr)
+library(readr)
+library(dplyr)
+library(ggplot2)
+```
+
+A continuación, se carga el dataset previamente procesado.
+
+```{r}
+data <- read_csv("./data/marketing_campaign_processed.csv")
+head(data)
 ```
 
 ```{r}
+summary(data)
+```
 
+## 4. Análisis exploratorio de los datos (EDA)
+
+Antes de aplicar contrastes estadísticos o modelos predictivos, realizamos un análisis exploratorio para comprender la distribución de la variable de queja y el comportamiento de compra por canal. Este paso es clave para:
+
+-   contextualizar los resultados inferenciales posteriores,
+-   detectar posibles desequilibrios (por ejemplo, si las quejas son un evento muy poco frecuente),
+-   comprender cómo se distribuyen las compras en cada canal,
+-   y anticipar la posible magnitud de la relación antes de aplicar contrastes formales.
+
+### 4.1. Distribución de la variable `Complain`
+
+En primer lugar, analizamos la frecuencia absoluta y relativa de clientes que han presentado quejas.
+
+```{r}
+# frecuencias absolutas
+table(data$Complain)
+
+# frecuencias relativas
+prop.table(table(data$Complain))
+```
+
+Visualizamos gráficamente la distribución:
+
+```{r}
+ggplot(data, aes(x = factor(Complain),
+                 fill = factor(Complain))) +
+  geom_bar(alpha = 0.8) +
+  scale_x_discrete(labels = c("0" = "No queja",
+                              "1" = "Queja")) +
+  scale_fill_manual(values = c("0" = "#1f77b4",
+                               "1" = "#d62728"),
+                    labels = c("0" = "No queja",
+                               "1" = "Queja")) +
+  labs(
+    title = "Número de clientes según si han presentado quejas",
+    x = "¿El cliente ha presentado queja?",
+    y = "Número de clientes",
+    fill = "Tipo de cliente"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  )
+```
+
+La variable `Complain` presenta un **fuerte desequilibrio entre clases**. De un total de 2209 clientes, únicamente 20 (aproximadamente el 0.91%) han presentado alguna queja en los últimos dos años, mientras que el 99.09% no lo han hecho.
+
+Esto indica que la presentación de quejas es un evento **muy poco frecuente** en el dataset. Desde el punto de vista estadístico, este desequilibrio implica que:
+
+-   Pequeñas variaciones en el número absoluto de quejas pueden generar diferencias aparentes en proporciones.
+-   La potencia de los contrastes estadísticos puede verse limitada en análisis segmentados.
+-   En la regresión logística, la clase minoritaria puede afectar la estabilidad de las estimaciones.
+
+Desde una perspectiva de negocio, este resultado sugiere que el nivel general de insatisfacción formalizada mediante quejas es muy reducido dentro de la base de clientes.
+
+### 4.2. Distribución de compras por canal
+
+Exploramos ahora el comportamiento de compra en cada canal: web, catálogo y tienda física.
+
+```{r}
+print("NumWebPurchases:")
+summary(data$NumWebPurchases)
+
+print("NumCatalogPurchases:")
+summary(data$NumCatalogPurchases)
+
+print("NumStorePurchases")
+summary(data$NumStorePurchases)
+```
+
+Visualizamos conjuntamente las distribuciones:
+
+```{r}
+data_long <- data %>%
+  select(NumWebPurchases, NumCatalogPurchases, NumStorePurchases) %>%
+  pivot_longer(cols = everything(),
+               names_to = "Channel",
+               values_to = "Purchases")
+
+data_long$Channel <- recode(data_long$Channel,
+                            "NumWebPurchases" = "Web",
+                            "NumCatalogPurchases" = "Catálogo",
+                            "NumStorePurchases" = "Tienda física")
+
+ggplot(data_long, aes(x = Channel, y = Purchases, fill = Channel)) +
+  geom_violin(trim = FALSE, alpha = 0.6) +
+  geom_boxplot(
+    width = 0.1,
+    fill = "white",
+    alpha = 0.6,
+    outlier.size = 2,
+    outlier.colour = "black",
+    outlier.shape = 16,
+    outlier.alpha = 0.9
+  ) +
+  scale_fill_manual(values = c(
+    "Web" = "#1f77b4",
+    "Catálogo" = "#2ca02c",
+    "Tienda física" = "#ff7f0e"
+  )) +
+  labs(title = "Distribución de compras por canal",
+       x = "Canal",
+       y = "Número de compras") +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  )
+```
+
+El análisis descriptivo muestra que la **tienda física es el canal más utilizado en términos medios**, seguida del canal web y, en último lugar, el catálogo.
+
+Las distribuciones presentan **asimetría positiva en los tres casos**, lo que indica que la mayoría de los clientes realiza un número moderado de compras, mientras que una minoría concentra niveles elevados de actividad. Este patrón es característico de comportamientos de consumo heterogéneos, donde un pequeño grupo de clientes concentra una parte relevante de la actividad total.
+
+La visualización mediante gráficos de violín permite observar que, aunque existen diferencias en las medianas entre canales, las distribuciones presentan un amplio rango de variabilidad y solapamiento.
+
+### 4.3. Uso multicanal: ¿cuántos canales utiliza cada cliente?
+
+Dado que un cliente puede comprar en varios canales, analizamos el número de canales distintos utilizados por cada uno (considerando `compras > 0`).
+
+```{r}
+data_channels_used <- data %>%
+  mutate(Channels_Used = (NumWebPurchases>0)+(NumCatalogPurchases>0)+(NumStorePurchases>0))
 ```
 
 ```{r}
-
+table(data_channels_used$Channels_Used)
+prop.table(table(data_channels_used$Channels_Used))
 ```
 
 ```{r}
+channels_counts <- data_channels_used %>%
+  count(Channels_Used) %>%
+  mutate(
+    pct = n / sum(n) * 100,
+    Channels_Used = factor(Channels_Used, levels = c(0, 1, 2, 3))
+  )
 
+ggplot(channels_counts, aes(x = Channels_Used, y = n, fill = Channels_Used)) +
+  geom_col(width = 0.7, alpha = 0.85) +
+  geom_text(aes(label = paste0(round(pct, 1), "%")),
+            vjust = -0.4, size = 4) +
+  labs(
+    title = "Número de canales utilizados por cliente",
+    subtitle = "Número de canales en donde los cliente han comprado al menos una vez",
+    x = "Número de canales usados",
+    y = "Número de clientes"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5)
+  )
+```
+
+El análisis revela que el **73.4% de los clientes utiliza los tres canales disponibles**, mientras que solo un 1.7% utiliza exclusivamente un único canal.
+
+Este resultado indica que el comportamiento predominante es claramente **multicanal**. En consecuencia, el concepto de *canal principal* no debe interpretarse como uso exclusivo, sino como el canal en el que el cliente concentra mayor intensidad de compra.
+
+Desde una perspectiva analítica, este hallazgo anticipa que la relación entre canal y queja podría no ser muy marcada en términos categóricos, ya que la mayoría de clientes no está segmentada de forma exclusiva por canal.
+
+### 4.4. Comparación descriptiva inicial: compras por canal según `Complain`
+
+Antes de realizar inferencia formal, comparamos descriptivamente el número de compras por canal entre clientes que se quejan y los que no.
+
+```{r}
+data %>%
+  group_by(Complain) %>%
+  summarise(
+    n = n(),
+    web_mean = mean(NumWebPurchases),
+    catalog_mean = mean(NumCatalogPurchases),
+    store_mean = mean(NumStorePurchases),
+    total_mean = mean(Total_Purchases)
+  )
 ```
 
 ```{r}
-
+ggplot(data, aes(x = factor(Complain), 
+                 y = NumWebPurchases, 
+                 fill = factor(Complain))) +
+  geom_violin(trim = FALSE, alpha = 0.6) +
+  geom_boxplot(
+    width = 0.1,
+    fill = "white",
+    alpha = 0.6,
+    outlier.size = 2,
+    outlier.shape = 16,
+    outlier.colour = "black",
+    outlier.alpha = 0.9
+  ) +
+  scale_x_discrete(labels = c("0" = "No queja",
+                              "1" = "Queja")) +
+  scale_fill_manual(values = c("0" = "#1f77b4",
+                               "1" = "#d62728"),
+                    labels = c("0" = "No queja",
+                               "1" = "Queja")) +
+  labs(title = "Compras en Web según queja",
+       x = "¿El cliente presenta queja?",
+       y = "Número de compras",
+       fill = "Tipo cliente") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  )
 ```
 
 ```{r}
-
+ggplot(data, aes(x = factor(Complain), 
+                 y = NumCatalogPurchases, 
+                 fill = factor(Complain))) +
+  geom_violin(trim = FALSE, alpha = 0.6) +
+  geom_boxplot(
+    width = 0.1,
+    fill = "white",
+    alpha = 0.6,
+    outlier.size = 2,
+    outlier.shape = 16,
+    outlier.colour = "black",
+    outlier.alpha = 0.9
+  ) +
+  scale_x_discrete(labels = c("0" = "No queja",
+                              "1" = "Queja")) +
+  scale_fill_manual(values = c("0" = "#1f77b4",
+                               "1" = "#d62728"),
+                    labels = c("0" = "No queja",
+                               "1" = "Queja")) +
+  labs(title = "Compras en Catálogo según queja",
+       x = "¿El cliente presenta queja?",
+       y = "Número de compras",
+       fill = "Tipo cliente") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  )
 ```
 
 ```{r}
+ggplot(data, aes(x = factor(Complain), 
+                 y = NumStorePurchases, 
+                 fill = factor(Complain))) +
+  geom_violin(trim = FALSE, alpha = 0.6) +
+  geom_boxplot(
+    width = 0.1,
+    fill = "white",
+    alpha = 0.6,
+    outlier.size = 2,
+    outlier.shape = 16,
+    outlier.colour = "black",
+    outlier.alpha = 0.9
+  ) +
+  scale_x_discrete(labels = c("0" = "No queja",
+                              "1" = "Queja")) +
+  scale_fill_manual(values = c("0" = "#1f77b4",
+                               "1" = "#d62728"),
+                    labels = c("0" = "No queja",
+                               "1" = "Queja")) +
+  labs(title = "Compras en Tienda física según queja",
+       x = "¿El cliente presenta queja?",
+       y = "Número de compras",
+       fill = "Tipo cliente") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  )
+```
 
+De forma descriptiva, los clientes que han presentado quejas parecen realizar, en promedio, un número ligeramente inferior de compras en todos los canales respecto a los que no se quejan. Sin embargo, las diferencias observadas son pequeñas en términos absolutos.
+
+La visualización mediante gráficos de violín muestra un **elevado solapamiento entre las distribuciones de ambos grupos**, lo que indica que no existe una separación clara en el comportamiento de compra entre clientes con y sin queja.
+
+Además, debe recordarse que el grupo de clientes con queja está compuesto únicamente por 20 observaciones, frente a 2189 sin queja. Este fuerte desequilibrio limita la capacidad de extraer conclusiones sólidas únicamente a partir del análisis descriptivo.
+
+En consecuencia, será necesario recurrir a contrastes formales (χ²) y modelos probabilísticos (regresión logística) para determinar si las diferencias observadas son estadísticamente significativas o pueden atribuirse al azar.
+
+## 5. Definición del canal principal del cliente
+
+Como se ha observado en el EDA, **la mayoría de los clientes realiza compras en más de un canal**. Sin embargo, para aplicar un contraste χ² de independencia (que requiere variables categóricas), es necesario construir una variable que resuma el comportamiento de compra por canal en una única categoría.
+
+En este trabajo se define el **canal principal** (`Primary_Channel`) como aquel canal que **concentra al menos el 50% del total de compras del cliente**. Este criterio tiene una interpretación clara: existe un canal dominante cuando **acumula la mayoría absoluta** de las compras del cliente, evitando clasificaciones arbitrarias en clientes con uso similar de varios canales (comportamiento marcadamente multicanal).
+
+En caso de que **ningún canal alcance ese 50%**, el cliente se clasifica como `"Mixed"`, reflejando un patrón de compra repartido entre varios canales.
+
+```{r}
+data <- data %>%
+  mutate(
+    Web_prop   = ifelse(Total_Purchases > 0, NumWebPurchases / Total_Purchases, NA_real_),
+    Cat_prop   = ifelse(Total_Purchases > 0, NumCatalogPurchases / Total_Purchases, NA_real_),
+    Store_prop = ifelse(Total_Purchases > 0, NumStorePurchases / Total_Purchases, NA_real_),
+    Primary_Channel = case_when(
+      Web_prop   >= 0.5 ~ "Web",
+      Cat_prop   >= 0.5 ~ "Catálogo",
+      Store_prop >= 0.5 ~ "Tienda física",
+      TRUE ~ "Mixed"
+    ),
+    Primary_Channel = factor(Primary_Channel, levels = c("Web", "Catálogo", "Tienda física", "Mixed"))
+  )
 ```
 
 ```{r}
-
+table(data$Primary_Channel)
+prop.table(table(data$Primary_Channel))
 ```
 
 ```{r}
+primary_counts <- data %>%
+  count(Primary_Channel) %>%
+  mutate(percentage = n / sum(n) * 100)
 
+ggplot(primary_counts, aes(x = Primary_Channel, y = n, fill = Primary_Channel)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  geom_text(aes(label = paste0(round(percentage,1), "%")),
+            vjust = -0.5,
+            size = 4) +
+  scale_fill_manual(values = c(
+    "Web" = "#1f77b4",
+    "Catálogo" = "#2ca02c",
+    "Tienda física" = "#ff7f0e",
+    "Mixed" = "grey60"
+  )) +
+  labs(
+    title = "Distribución del canal principal de compra",
+    subtitle = "Clasificación según el canal con mayor número de compras",
+    x = "Canal principal",
+    y = "Número de clientes"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5)
+  )
 ```
+
+Se observa que la **tienda física es el canal claramente dominante**, concentrando el 52.9% de los clientes. Esto indica que, para más de la mitad, la tienda física representa el canal mayoritario de compra en términos relativos, consolidándose como el eje central del comportamiento comercial.
+
+Por otro lado, un 33.7% de los clientes se clasifica como **Mixed**, lo que implica que en estos casos ningún canal alcanza por sí solo la mayoría absoluta de compras. Este resultado es coherente con el carácter multicanal identificado previamente en el EDA, donde la mayoría de clientes utilizaba varios canales de forma simultánea.
+
+El canal **web** actúa como dominante en el 11.5% de los clientes, mientras que el **catálogo** presenta una dominancia muy reducida (1.9%), lo que sugiere que este último funciona más como canal complementario que como canal principal de compra.
+
+Desde el punto de vista analítico, esta distribución es especialmente relevante para el contraste χ² posterior. La fuerte concentración en tienda física y la presencia significativa de la categoría Mixed podrían influir en las frecuencias esperadas del test, aspecto que deberá verificarse al evaluar los supuestos del contraste. Además, dado que la variable `Complain` es un evento muy poco frecuente (0.9%), el cruce entre ambas variables podría generar celdas con recuentos bajos, lo que refuerza la necesidad de interpretar los resultados con cautela.
+
+## 6. Asociación entre canal principal y presentación de quejas
+
+Una vez definida la variable `Primary_Channel`, analizamos si existe relación entre el canal dominante del cliente y la presentación de quejas.
+
+El primer paso consiste en construir una tabla de contingencia, que permita observar la distribución conjunta de ambas variables.
+
+### 6.1. Tabla de contingencia y análisis descriptivo
+
+Tabla de frecuencias absolutas:
 
 ```{r}
-
+tabla_contingencia <- table(data$Primary_Channel, data$Complain)
+tabla_contingencia
 ```
+
+La tabla que mostramos ahora resume el número de quejas y la tasa de queja (quejas/total) dentro de cada canal principal, lo que facilita comparar canales en términos relativos.
 
 ```{r}
+tasa_queja <- as.data.frame(tabla_contingencia) %>%
+  rename(Primary_Channel = Var1, Complain = Var2, n = Freq) %>%
+  group_by(Primary_Channel) %>%
+  mutate(total = sum(n)) %>%
+  filter(Complain == 1) %>%
+  transmute(
+    Primary_Channel,
+    Quejas = n,
+    Total = total,
+    Tasa_queja = n / total
+  )
 
+tasa_queja
 ```
+
+Para facilitar la interpretación, representamos gráficamente la proporción de quejas por canal principal.
 
 ```{r}
+tabla_plot <- as.data.frame(tabla_contingencia) %>%
+  rename(
+    Primary_Channel = Var1,
+    Complain = Var2,
+    n = Freq
+  ) %>%
+  group_by(Primary_Channel) %>%
+  mutate(
+    total_channel = sum(n),
+    proportion = n / total_channel
+  )
 
+tabla_plot$Complain <- factor(tabla_plot$Complain,
+                              levels = c("0", "1"),
+                              labels = c("No queja", "Queja"))
+
+ggplot(tabla_plot, aes(x = Primary_Channel,
+                       y = proportion,
+                       fill = Complain)) +
+  geom_col(position = "fill", width = 0.7) +
+  scale_fill_manual(values = c("No queja" = "#1f77b4",
+                               "Queja" = "#d62728")) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    title = "Proporción de quejas según canal principal",
+    subtitle = "Distribución porcentual dentro de cada canal",
+    x = "Canal principal",
+    y = "Porcentaje dentro del canal",
+    fill = "Tipo de cliente"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5)
+  )
 ```
+
+El análisis descriptivo de la tabla de contingencia y del gráfico de proporciones muestra que la tasa de queja es baja en todos los canales principales, situándose en valores inferiores al 1.2% en todos los casos. Aunque el canal Web presenta la proporción ligeramente más alta (1.19%) y el grupo Mixed la más baja (0.81%), las diferencias observadas son reducidas en términos absolutos y no parecen reflejar un patrón estructural claro.
+
+Debe tenerse en cuenta que el número total de quejas en la muestra es muy limitado (20 casos sobre 2209 clientes), lo que implica que pequeñas variaciones en el número de quejas pueden generar cambios relativamente visibles en las proporciones. En este contexto, las diferencias detectadas podrían deberse a fluctuaciones muestrales más que a una relación real entre el canal principal y la probabilidad de presentar una queja.
+
+En consecuencia, desde una perspectiva estrictamente descriptiva, **no se aprecia una evidencia clara de que el canal principal de compra esté asociado de forma relevante con la presentación de quejas**. No obstante, para determinar si las diferencias observadas son estadísticamente significativas o pueden atribuirse al azar, resulta necesario aplicar el contraste formal de independencia mediante el test χ² en el siguiente apartado.
+
+### 6.2. Contraste χ² de independencia
+
+Una vez analizada la relación de forma descriptiva, procedemos a evaluar formalmente si existe asociación entre el canal principal de compra y la presentación de quejas mediante el contraste χ² de independencia.
+
+Recordemos las hipótesis planteadas:
+
+-   **H₀ (Hipótesis nula)**: El canal principal de compra y la presentación de quejas son variables independientes.
+-   **H₁ (Hipótesis alternativa)**: Existe asociación entre el canal principal de compra y la presentación de quejas.
+
+El contraste se evaluará al nivel de significación habitual del 5% (α = 0.05).
+
+Aplicamos el test χ²:
 
 ```{r}
-
+chi_test <- chisq.test(tabla_contingencia)
+chi_test
 ```
+
+Dado que el **p-valor (0.872) es muy superior al nivel de significación α = 0.05**, no se rechaza la hipótesis nula de independencia.
+
+Esto implica que **no existe evidencia estadísticamente significativa** para afirmar que el canal principal de compra esté asociado con la presentación de quejas. En otras palabras, las pequeñas diferencias observadas en el análisis descriptivo pueden atribuirse razonablemente al azar.
+
+El valor del estadístico χ² es además muy bajo, lo que indica que la discrepancia entre las frecuencias observadas y las frecuencias esperadas bajo independencia es mínima.
+
+#### 6.2.1. Verificación de supuestos
+
+El test χ² requiere que las **frecuencias esperadas no sean demasiado pequeñas**.
 
 ```{r}
-
+chi_test$expected
 ```
+
+El test χ² devuelve el aviso *“Chi-squared approximation may be incorrect”*. Este warning aparece cuando algunas frecuencias esperadas son bajas. En nuestro caso, debido a que la variable `Complain` es extremadamente infrecuente (solo 20 quejas), las frecuencias esperadas en la columna de quejas son pequeñas en algunos canales, especialmente en **Catálogo** y Web.
+
+Aun así, el resultado del contraste es muy claro: el estadístico χ² es bajo (0.705) y el p-valor es muy alto (0.872), por lo que incluso considerando esta limitación, **no hay evidencia de asociación**.
+
+#### 6.2.2. Tamaño del efecto: Cramér’s V
+
+Más allá del p-valor, es fundamental cuantificar la intensidad de la asociación mediante una medida de tamaño del efecto.
+
+Calculamos el estadístico de Cramér:
 
 ```{r}
+chi2_stat <- chi_test$statistic
+n_total <- sum(tabla_contingencia)
+k <- min(nrow(tabla_contingencia) - 1, ncol(tabla_contingencia) - 1)
 
+cramers_v <- sqrt(chi2_stat / (n_total * k))
+cramers_v
 ```
+
+El valor obtenido de Cramér’s V es: `V = 0.0179`. Este valor se sitúa claramente en el rango de *asociación prácticamente inexistente*.
+
+Desde una perspectiva práctica, esto indica que la relación entre el canal principal y la presentación de quejas es **virtualmente nula**.
+
+No solo no existe significación estadística, sino que además la magnitud de la posible asociación es extremadamente pequeña.
+
+## 7. Modelización: regresión logística binaria
+
+Hasta ahora hemos analizado la relación de forma categórica usando `Primary_Channel.` Sin embargo, este enfoque resume el comportamiento del cliente en una sola etiqueta y puede perder información relevante, especialmente teniendo en cuenta que la mayoría de clientes es multicanal.
+
+Por ello, complementamos el análisis con un modelo de **regresión logística binaria**, que permite estimar la probabilidad de que un **cliente presente una queja** (`Complain=1`) **en función del número de compras en cada canal**.
+
+Este modelo permite responder no solo si hay relación, sino **qué canal parece tener mayor impacto**, en qué dirección y con qué intensidad (mediante **odds ratios**).
+
+### 7.1. Ajuste del modelo
+
+Ajustamos un modelo logístico con enlace logit:
 
 ```{r}
+model_logit <- glm(
+  Complain ~ NumWebPurchases + NumCatalogPurchases + NumStorePurchases,
+  data = data,
+  family = binomial(link = "logit")
+)
 
+summary(model_logit)
 ```
+
+El modelo de regresión logística ajustado no muestra evidencia estadísticamente significativa de que el número de compras en ninguno de los canales analizados esté asociado con la probabilidad de presentar una queja.
+
+En concreto:
+
+-   El coeficiente asociado a **NumWebPurchases** es negativo (−0.0276), lo que indicaría, en términos de log-odds, una ligera reducción en la probabilidad de queja al aumentar las compras web. Sin embargo, este efecto no es estadísticamente significativo (p = 0.795).
+-   El coeficiente de **NumCatalogPurchases** también es negativo (−0.0724), pero igualmente no significativo (p = 0.532).
+-   El coeficiente de **NumStorePurchases** es muy cercano a cero (0.0071), con un p-valor de 0.942, lo que indica ausencia total de evidencia de efecto.
+
+En todos los casos, los p-valores son muy superiores al nivel de significación habitual (α = 0.05), por lo que no se rechaza la hipótesis de que los coeficientes sean iguales a cero.
+
+Además, la diferencia entre la null deviance (228.00) y la residual deviance (227.07) es mínima, lo que indica que el modelo apenas mejora respecto a un modelo sin variables explicativas. Esto sugiere que el número de compras por canal tiene un poder explicativo prácticamente nulo sobre la aparición de quejas.
+
+En consecuencia, los resultados del modelo logístico son coherentes con el análisis χ² previo: **no existe evidencia de que el canal de compra, medido por intensidad de uso, sea un factor determinante en la probabilidad de presentar una queja en este dataset**.
+
+### 7.2. Interpretación mediante Odds Ratios
+
+Aunque los coeficientes no resultan estadísticamente significativos, resulta conveniente transformar las estimaciones a odds ratios (OR) para facilitar su interpretación en términos prácticos.
+
+Recordemos que en regresión logística: $OR = e^{\beta}$
+
+Donde, un OR:
+
+-   Mayor que 1 indica aumento en la probabilidad de queja.
+-   Menor que 1 indica disminución.
+-   Igual a 1 indica ausencia de efecto.
+
+Calculamos los odds ratios:
 
 ```{r}
-
+or <- exp(coef(model_logit))
+or
 ```
+
+Y los intervalos de confianza del 95%:
 
 ```{r}
+ic <- exp(confint(model_logit))
 
+or_table <- data.frame(
+  Variable = names(or),
+  OR = as.numeric(or),
+  CI_low = as.numeric(ic[,1]),
+  CI_high = as.numeric(ic[,2])
+)
+
+or_table
 ```
 
-```{r}
+Los odds ratios obtenidos confirman la ausencia de relación significativa entre el número de compras por canal y la probabilidad de presentar una queja.
 
-```
+En concreto:
 
-```{r}
+-   Para **NumWebPurchases**, el OR es 0.973, lo que implica que cada compra adicional en web se asocia con una reducción aproximada del 2.7% en los odds de queja. Sin embargo, el intervalo de confianza al 95% [0.77, 1.15] incluye claramente el valor 1, por lo que el efecto no es estadísticamente significativo.
+-   Para **NumCatalogPurchases**, el OR es 0.930, lo que sugeriría una reducción aproximada del 7% en los odds de queja por cada compra adicional en catálogo. No obstante, su intervalo de confianza [0.71,1.11] también incluye el valor 1, lo que indica ausencia de evidencia concluyente.
+-   Para **NumStorePurchases**, el OR es 1.007, prácticamente igual a 1, lo que indica que una compra adicional en tienda física no modifica de forma apreciable la probabilidad de queja. Su intervalo de confianza [0.83,1.21] confirma igualmente la falta de significación estadística.
 
-```
+En todos los casos, los intervalos de confianza son relativamente amplios y atraviesan el valor 1, lo que refuerza la conclusión de que **no existe un efecto estadísticamente significativo ni relevante en términos prácticos**.
 
-```{r}
+En consecuencia, el modelo logístico refuerza la evidencia obtenida mediante el contraste χ²: no se observa asociación significativa entre la intensidad de uso de los canales de compra y la probabilidad de presentar una queja.
 
-```
+## 8. Conclusiones
 
-```{r}
+El objetivo de este estudio era responder a la siguiente pregunta de investigación:
 
-```
+> ¿Existe relación entre el canal de compra y la presentación de quejas por parte del cliente?
 
-```{r}
+Para abordar esta cuestión se adoptó un **enfoque progresivo y complementario**, combinando análisis descriptivo, contraste de independencia y modelización probabilística.
 
-```
+En primer lugar, el análisis exploratorio permitió contextualizar el problema. Se observó que la **tasa global de quejas es extremadamente baja (0.9%)**, lo que ya anticipaba que cualquier posible asociación sería, en caso de existir, de magnitud reducida. Asimismo, se constató que el comportamiento predominante es claramente **multicanal**, con un 73.4% de clientes utilizando los tres canales disponibles. Este patrón sugiere que la segmentación estricta por canal podría no capturar completamente la realidad del comportamiento de compra.
 
-```{r}
+En segundo lugar, el contraste χ² de independencia aplicado al canal principal de compra **no mostró evidencia estadísticamente significativa de asociación (p=0.872)**. La diferencia entre frecuencias observadas y esperadas fue mínima, y el tamaño del efecto estimado mediante **Cramér’s V (aproximadamente 0.018) indicó una asociación prácticamente inexistente**. Es decir, **incluso si existiera algún grado de relación, su magnitud sería irrelevante en términos prácticos**.
 
-```
+En tercer lugar, el modelo de regresión logística binaria permitió analizar la relación desde una perspectiva más detallada, utilizando el número de compras en cada canal como variables explicativas. Los resultados confirmaron lo observado previamente: **ninguno de los coeficientes asociados a los canales resultó estadísticamente significativo**, los **odds ratios fueron muy cercanos a 1** y los intervalos de confianza incluyeron dicho valor. Además, la mejora respecto al modelo nulo fue prácticamente inexistente, lo que indica que **la intensidad de uso de los canales no aporta capacidad explicativa sobre la probabilidad de queja**.
 
-```{r}
+La coherencia entre los distintos enfoques aplicados refuerza la robustez de la conclusión: **no se encuentra evidencia empírica de que el canal de compra, ya sea considerado como canal dominante o como intensidad de uso, esté asociado con la presentación de quejas en este conjunto de datos**.
 
-```
+Desde una perspectiva empresarial, este resultado puede interpretarse como un indicio de **homogeneidad en la experiencia de cliente entre los distintos canales de compra**. En otras palabras, **no parece que un canal concreto concentre mayor nivel de insatisfacción formalizada mediante quejas**. Alternativamente, el resultado sugiere que los determinantes de la queja podrían encontrarse en otras dimensiones no analizadas en este estudio, como el perfil sociodemográfico del cliente, el tipo de producto adquirido, la experiencia postventa o incidencias logísticas específicas.
 
-```{r}
+Finalmente, debe reconocerse como limitación metodológica la **baja frecuencia del evento analizado**, que reduce la potencia estadística y dificulta la detección de asociaciones débiles. No obstante, la consistencia entre los resultados descriptivos, inferenciales y probabilísticos indica que, aun considerando esta limitación, la relación entre canal y queja es, en el mejor de los casos, muy reducida.
 
-```
+En consecuencia, la evidencia obtenida permite responder a la pregunta de investigación de forma clara:
 
-```{r}
-
-```
+> El canal de compra no parece constituir un factor determinante en la aparición de quejas en esta base de clientes.
