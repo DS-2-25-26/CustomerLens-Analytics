@@ -1,0 +1,587 @@
+---
+title: "CustomerLens-Analytics. Grupo 2."
+author: "Jaime Linares Barrera, Andrés Martínez Reviriego, Pablo Oliva Muñoz y Francisco Javier Ruiz Rodríguez "
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    # number_sections: true
+---
+
+# Pregunta 1: ¿Hay relación entre la estructura familiar del cliente y su patrón de consumo?
+
+## Contextualización y motivación
+
+Comprender cómo la estructura familiar influye en el comportamiento de compra es una de las preguntas más relevantes en *Customer Analytics*. Los hogares con hijos suelen redistribuir su presupuesto hacia productos esenciales y reducir el gasto en categorías más asociadas al ocio o al lujo. Desde una perspectiva empresarial, identificar estos patrones permite diseñar campañas de marketing segmentadas, personalizar la oferta de productos y optimizar la asignación de recursos comerciales. En este notebook, analizamos si la presencia, el número de menores en el hogar y el estado civil del cliente están asociados con diferencias significativas en su patrón de consumo.
+
+A partir de la pregunta principal se derivan las siguientes subpreguntas:
+
+-   ¿Los hogares con hijos gastan menos en total que los hogares sin hijos?
+-   ¿Cambia la distribución del gasto por categoría de producto según la presencia de hijos?
+-   ¿Influye el número de menores en el hogar en el gasto total y por tipo de producto?
+-   ¿Existe relación entre el estado civil del cliente y su patrón de consumo?
+-   **Pregunta extra**: ¿Qué variables de estructura familiar son las más determinantes para predecir el nivel de gasto de un cliente?
+
+## Carga de librerías y datos
+
+Cargamos las librerías necesarias y el dataset ya preprocesado en el notebook anterior (`1_preprocesamiento.Rmd`).
+
+```{r setup, message=FALSE, warning=FALSE}
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(tidyr)
+library(scales)
+library(rpart)
+library(rpart.plot)
+```
+
+```{r}
+data <- read_csv("./data/marketing_campaign_processed.csv", show_col_types = FALSE)
+
+# Convertimos las variables categóricas a factor
+data$Education <- factor(data$Education,
+    levels = c("Basic", "2n Cycle", "Graduation", "Master", "PhD"),
+    ordered = TRUE
+)
+data$Marital_Status <- factor(data$Marital_Status,
+    levels = c("Single", "Together", "Married", "Divorced", "Widow")
+)
+data$Has_Children <- factor(data$Has_Children, levels = c(0, 1), labels = c("Sin hijos", "Con hijos"))
+data$Children_Home <- factor(data$Children_Home)
+```
+
+Definimos una paleta de colores coherente que utilizaremos a lo largo de todo el análisis:
+
+```{r}
+palette_main <- c("Sin hijos" = "#2E86AB", "Con hijos" = "#E8505B")
+palette_products <- c(
+    "Vino" = "#722F37", "Fruta" = "#7CB518", "Carne" = "#D4453B",
+    "Pescado" = "#1B98E0", "Dulces" = "#F4A261", "Oro" = "#E9C46A"
+)
+palette_children <- c("0" = "#2E86AB", "1" = "#F4A261", "2" = "#E8505B", "3" = "#6B4226")
+```
+
+## Análisis 1: Gasto total según presencia de hijos
+
+### 1.1. Exploración descriptiva
+
+Comenzamos comparando el gasto total entre hogares con y sin hijos.
+
+```{r}
+stats_hijos <- data %>%
+    group_by(Has_Children) %>%
+    summarise(
+        n = n(),
+        media = mean(Total_Spending),
+        mediana = median(Total_Spending),
+        desv_tip = sd(Total_Spending),
+        Q1 = quantile(Total_Spending, 0.25),
+        Q3 = quantile(Total_Spending, 0.75),
+        .groups = "drop"
+    )
+stats_hijos
+```
+
+### 1.2. Visualización: distribución del gasto total
+
+```{r fig.width=9, fig.height=5}
+ggplot(data, aes(x = Has_Children, y = Total_Spending, fill = Has_Children)) +
+    geom_violin(alpha = 0.3, color = NA) +
+    geom_boxplot(width = 0.25, alpha = 0.8, outlier.alpha = 0.3, outlier.size = 1) +
+    stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "black") +
+    scale_fill_manual(values = palette_main) +
+    scale_y_continuous(labels = comma_format(big.mark = ".")) +
+    labs(
+        title = "Distribución del gasto total según presencia de hijos",
+        subtitle = "El rombo negro indica la media de cada grupo",
+        x = NULL, y = "Gasto total (€, últimos 2 años)"
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(
+        legend.position = "none",
+        plot.title = element_text(face = "bold")
+    )
+```
+
+### 1.3. Test estadístico: Wilcoxon
+
+Dado que la distribución del gasto total presenta asimetría y valores atípicos, utilizamos el **test de Wilcoxon** (test no paramétrico equivalente al *t*-test), que no asume normalidad y es robusto frente a distribuciones sesgadas.
+
+```{r}
+wilcox_total <- wilcox.test(Total_Spending ~ Has_Children, data = data)
+wilcox_total
+```
+
+```{r}
+cat(
+    "Tamaño del efecto (diferencia de medianas):",
+    median(data$Total_Spending[data$Has_Children == "Sin hijos"]) -
+        median(data$Total_Spending[data$Has_Children == "Con hijos"]), "€\n"
+)
+```
+
+**Interpretación**: Si el *p-valor* es inferior a 0,05, existe evidencia estadísticamente significativa de que los hogares con hijos y sin hijos presentan un gasto total diferente. El tamaño del efecto (diferencia de medianas) cuantifica la magnitud práctica de esta diferencia.
+
+## Análisis 2: Distribución del gasto por categoría de producto
+
+### 2.1. Gasto medio por categoría y grupo familiar
+
+Analizamos si la presencia de hijos no solo afecta al gasto total, sino también a *cómo* se distribuye el presupuesto entre categorías de producto.
+
+```{r}
+gasto_categorias <- data %>%
+    group_by(Has_Children) %>%
+    summarise(
+        Vino = mean(MntWines),
+        Fruta = mean(MntFruits),
+        Carne = mean(MntMeatProducts),
+        Pescado = mean(MntFishProducts),
+        Dulces = mean(MntSweetProducts),
+        Oro = mean(MntGoldProds),
+        .groups = "drop"
+    ) %>%
+    pivot_longer(-Has_Children, names_to = "Categoria", values_to = "Gasto_Medio")
+
+gasto_categorias
+```
+
+### 2.2. Visualización: gasto medio por categoría
+
+```{r fig.width=10, fig.height=5}
+ggplot(gasto_categorias, aes(x = reorder(Categoria, -Gasto_Medio), y = Gasto_Medio, fill = Has_Children)) +
+    geom_col(position = position_dodge(width = 0.8), width = 0.7, alpha = 0.9) +
+    scale_fill_manual(values = palette_main) +
+    scale_y_continuous(labels = comma_format(big.mark = ".")) +
+    labs(
+        title = "Gasto medio por categoría de producto según presencia de hijos",
+        x = "Categoría de producto", y = "Gasto medio (€)",
+        fill = "Estructura familiar"
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(
+        plot.title = element_text(face = "bold"),
+        legend.position = "top"
+    )
+```
+
+### 2.3. Proporción relativa del gasto
+
+Para entender mejor cómo se *redistribuye* el presupuesto, calculamos la proporción relativa de cada categoría sobre el gasto total de cada grupo.
+
+```{r fig.width=10, fig.height=5}
+proporciones <- data %>%
+    mutate(across(starts_with("Mnt"), ~ . / pmax(Total_Spending, 1))) %>%
+    group_by(Has_Children) %>%
+    summarise(
+        Vino = mean(MntWines),
+        Fruta = mean(MntFruits),
+        Carne = mean(MntMeatProducts),
+        Pescado = mean(MntFishProducts),
+        Dulces = mean(MntSweetProducts),
+        Oro = mean(MntGoldProds),
+        .groups = "drop"
+    ) %>%
+    pivot_longer(-Has_Children, names_to = "Categoria", values_to = "Proporcion")
+
+ggplot(proporciones, aes(x = Has_Children, y = Proporcion, fill = Categoria)) +
+    geom_col(position = "fill", width = 0.6, alpha = 0.9) +
+    scale_fill_manual(values = palette_products) +
+    scale_y_continuous(labels = percent_format()) +
+    labs(
+        title = "Proporción relativa del gasto por categoría según presencia de hijos",
+        subtitle = "Distribución porcentual del presupuesto medio entre categorías",
+        x = NULL, y = "Proporción del gasto total",
+        fill = "Categoría"
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(
+        plot.title = element_text(face = "bold"),
+        legend.position = "right"
+    )
+```
+
+### 2.4. Tests estadísticos por categoría
+
+Aplicamos el test de Wilcoxon a cada categoría de producto para determinar si las diferencias son significativas.
+
+```{r}
+categorias <- c(
+    "MntWines", "MntFruits", "MntMeatProducts",
+    "MntFishProducts", "MntSweetProducts", "MntGoldProds"
+)
+nombres <- c("Vino", "Fruta", "Carne", "Pescado", "Dulces", "Oro")
+
+resultados_wilcox <- data.frame(
+    Categoria = nombres,
+    W = numeric(6),
+    p_valor = numeric(6),
+    Significativo = character(6),
+    stringsAsFactors = FALSE
+)
+
+for (i in seq_along(categorias)) {
+    test <- wilcox.test(data[[categorias[i]]] ~ data$Has_Children)
+    resultados_wilcox$W[i] <- test$statistic
+    resultados_wilcox$p_valor[i] <- test$p.value
+    resultados_wilcox$Significativo[i] <- ifelse(test$p.value < 0.05, "Sí ***", "No")
+}
+
+resultados_wilcox
+```
+
+## Análisis 3: Efecto del número de menores en el hogar
+
+### 3.1. Distribución del gasto total según número de hijos
+
+Más allá de la distinción binaria (con/sin hijos), examinamos si existe un efecto gradual del número de menores en el hogar.
+
+```{r}
+data %>%
+    group_by(Children_Home) %>%
+    summarise(
+        n = n(),
+        media = mean(Total_Spending),
+        mediana = median(Total_Spending),
+        desv_tip = sd(Total_Spending),
+        .groups = "drop"
+    )
+```
+
+```{r fig.width=10, fig.height=5}
+ggplot(data, aes(x = Children_Home, y = Total_Spending, fill = Children_Home)) +
+    geom_violin(alpha = 0.3, color = NA) +
+    geom_boxplot(width = 0.2, alpha = 0.8, outlier.alpha = 0.3, outlier.size = 1) +
+    stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "black") +
+    scale_fill_manual(values = palette_children) +
+    scale_y_continuous(labels = comma_format(big.mark = ".")) +
+    labs(
+        title = "Distribución del gasto total según número de menores en el hogar",
+        subtitle = "El rombo negro indica la media; se observa una tendencia descendente con más hijos",
+        x = "Número de menores en el hogar", y = "Gasto total (€)"
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(
+        legend.position = "none",
+        plot.title = element_text(face = "bold")
+    )
+```
+
+### 3.2. Test de Kruskal-Wallis
+
+El **test de Kruskal-Wallis** es la extensión no paramétrica del ANOVA y permite comparar más de dos grupos cuando no se asume normalidad.
+
+```{r}
+kruskal_children <- kruskal.test(Total_Spending ~ Children_Home, data = data)
+kruskal_children
+```
+
+### 3.3. Comparaciones post-hoc: Test de Dunn
+
+Si el test de Kruskal-Wallis resulta significativo, necesitamos saber *qué pares de grupos* difieren entre sí. Para ello aplicamos el **test de Dunn** con corrección de Bonferroni para controlar el error de tipo I por múltiples comparaciones.
+
+```{r}
+if (!requireNamespace("dunn.test", quietly = TRUE)) install.packages("dunn.test", repos = "https://cran.r-project.org/")
+library(dunn.test)
+
+dunn_result <- dunn.test(data$Total_Spending, data$Children_Home, method = "bonferroni")
+```
+
+### 3.4. Gasto por categoría según número de hijos
+
+```{r fig.width=10, fig.height=6}
+gasto_nhijos <- data %>%
+    select(
+        Children_Home, MntWines, MntFruits, MntMeatProducts,
+        MntFishProducts, MntSweetProducts, MntGoldProds
+    ) %>%
+    pivot_longer(-Children_Home, names_to = "Categoria", values_to = "Gasto") %>%
+    mutate(Categoria = recode(Categoria,
+        "MntWines" = "Vino", "MntFruits" = "Fruta", "MntMeatProducts" = "Carne",
+        "MntFishProducts" = "Pescado", "MntSweetProducts" = "Dulces", "MntGoldProds" = "Oro"
+    ))
+
+ggplot(gasto_nhijos, aes(x = Children_Home, y = Gasto, fill = Children_Home)) +
+    geom_boxplot(alpha = 0.8, outlier.alpha = 0.3, outlier.size = 0.8) +
+    scale_fill_manual(values = palette_children) +
+    facet_wrap(~Categoria, scales = "free_y", ncol = 3) +
+    scale_y_continuous(labels = comma_format(big.mark = ".")) +
+    labs(
+        title = "Gasto por categoría de producto según número de menores en el hogar",
+        x = "Nº de menores", y = "Gasto (€)"
+    ) +
+    theme_minimal(base_size = 12) +
+    theme(
+        legend.position = "none",
+        plot.title = element_text(face = "bold"),
+        strip.text = element_text(face = "bold")
+    )
+```
+
+## Análisis 4: Correlaciones entre estructura familiar y gasto
+
+### 4.1. Matriz de correlaciones de Spearman
+
+Utilizamos el **coeficiente de correlación de Spearman**, que mide la asociación monotónica entre variables y es adecuado cuando las distribuciones no son normales.
+
+```{r fig.width=8, fig.height=6}
+vars_correlacion <- data %>%
+    select(Kidhome, Teenhome,
+        Children_Home_num = Children_Home,
+        MntWines, MntFruits, MntMeatProducts,
+        MntFishProducts, MntSweetProducts, MntGoldProds, Total_Spending
+    ) %>%
+    mutate(Children_Home_num = as.numeric(as.character(Children_Home_num)))
+
+cor_matrix <- cor(vars_correlacion, method = "spearman")
+
+# Visualización manual del heatmap
+cor_df <- as.data.frame(as.table(cor_matrix))
+names(cor_df) <- c("Var1", "Var2", "Correlacion")
+
+# Renombrar variables para mejor legibilidad
+niveles <- c(
+    "Kidhome", "Teenhome", "Children_Home_num",
+    "MntWines", "MntFruits", "MntMeatProducts",
+    "MntFishProducts", "MntSweetProducts", "MntGoldProds", "Total_Spending"
+)
+etiquetas <- c(
+    "Kidhome", "Teenhome", "Nº Hijos",
+    "Vino", "Fruta", "Carne",
+    "Pescado", "Dulces", "Oro", "Gasto Total"
+)
+
+cor_df$Var1 <- factor(cor_df$Var1, levels = niveles, labels = etiquetas)
+cor_df$Var2 <- factor(cor_df$Var2, levels = niveles, labels = etiquetas)
+
+ggplot(cor_df, aes(x = Var1, y = Var2, fill = Correlacion)) +
+    geom_tile(color = "white", linewidth = 0.5) +
+    geom_text(aes(label = sprintf("%.2f", Correlacion)), size = 3) +
+    scale_fill_gradient2(
+        low = "#2E86AB", mid = "white", high = "#E8505B",
+        midpoint = 0, limits = c(-1, 1)
+    ) +
+    labs(
+        title = "Matriz de correlaciones de Spearman",
+        subtitle = "Relación entre estructura familiar y gasto por categoría",
+        x = NULL, y = NULL, fill = "ρ"
+    ) +
+    theme_minimal(base_size = 11) +
+    theme(
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(face = "bold"),
+        panel.grid = element_blank()
+    )
+```
+
+### 4.2. Significancia de las correlaciones clave
+
+```{r}
+vars_familia <- c("Kidhome", "Teenhome")
+vars_gasto <- c(
+    "MntWines", "MntFruits", "MntMeatProducts",
+    "MntFishProducts", "MntSweetProducts", "MntGoldProds", "Total_Spending"
+)
+
+resultados_cor <- expand.grid(
+    Familia = vars_familia, Gasto = vars_gasto,
+    stringsAsFactors = FALSE
+)
+resultados_cor$rho <- NA
+resultados_cor$p_valor <- NA
+
+for (i in seq_len(nrow(resultados_cor))) {
+    test <- cor.test(
+        as.numeric(as.character(data[[resultados_cor$Familia[i]]])),
+        data[[resultados_cor$Gasto[i]]],
+        method = "spearman"
+    )
+    resultados_cor$rho[i] <- round(test$estimate, 3)
+    resultados_cor$p_valor[i] <- test$p.value
+}
+
+resultados_cor$Significativo <- ifelse(resultados_cor$p_valor < 0.05, "Sí", "No")
+resultados_cor
+```
+
+## Análisis 5: Estado civil y patrón de consumo
+
+### 5.1. Gasto total por estado civil
+
+```{r}
+data %>%
+    group_by(Marital_Status) %>%
+    summarise(
+        n = n(),
+        media = mean(Total_Spending),
+        mediana = median(Total_Spending),
+        desv_tip = sd(Total_Spending),
+        .groups = "drop"
+    )
+```
+
+```{r fig.width=10, fig.height=5}
+ggplot(data, aes(x = Marital_Status, y = Total_Spending, fill = Marital_Status)) +
+    geom_violin(alpha = 0.3, color = NA) +
+    geom_boxplot(width = 0.2, alpha = 0.8, outlier.alpha = 0.3, outlier.size = 1) +
+    stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "black") +
+    scale_fill_brewer(palette = "Set2") +
+    scale_y_continuous(labels = comma_format(big.mark = ".")) +
+    labs(
+        title = "Distribución del gasto total según estado civil",
+        subtitle = "El rombo negro indica la media de cada grupo",
+        x = "Estado civil", y = "Gasto total (€)"
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(
+        legend.position = "none",
+        plot.title = element_text(face = "bold")
+    )
+```
+
+### 5.2. Test de Kruskal-Wallis
+
+```{r}
+kruskal_marital <- kruskal.test(Total_Spending ~ Marital_Status, data = data)
+kruskal_marital
+```
+
+### 5.3. Comparaciones post-hoc por estado civil
+
+```{r}
+dunn_marital <- dunn.test(data$Total_Spending, data$Marital_Status, method = "bonferroni")
+```
+
+### 5.4. Perfil de gasto por categoría y estado civil
+
+```{r fig.width=10, fig.height=5}
+gasto_marital <- data %>%
+    group_by(Marital_Status) %>%
+    summarise(
+        Vino = mean(MntWines),
+        Fruta = mean(MntFruits),
+        Carne = mean(MntMeatProducts),
+        Pescado = mean(MntFishProducts),
+        Dulces = mean(MntSweetProducts),
+        Oro = mean(MntGoldProds),
+        .groups = "drop"
+    ) %>%
+    pivot_longer(-Marital_Status, names_to = "Categoria", values_to = "Gasto_Medio")
+
+ggplot(gasto_marital, aes(x = Marital_Status, y = Gasto_Medio, fill = Categoria)) +
+    geom_col(position = "fill", width = 0.7, alpha = 0.9) +
+    scale_fill_manual(values = palette_products) +
+    scale_y_continuous(labels = percent_format()) +
+    labs(
+        title = "Distribución proporcional del gasto por estado civil",
+        x = "Estado civil", y = "Proporción del gasto",
+        fill = "Categoría"
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(plot.title = element_text(face = "bold"))
+```
+
+## Análisis 6 (Pregunta extra): Modelo predictivo — Árbol de decisión
+
+Para ir más allá del análisis descriptivo y los tests estadísticos, construimos un **árbol de decisión** que predice el nivel de gasto (`Total_Spending`) a partir de las variables de estructura familiar. Este modelo permite identificar qué variables son las más determinantes y qué combinaciones de características definen los distintos perfiles de gasto.
+
+```{r}
+data_modelo <- data %>%
+    mutate(Children_Home_num = as.numeric(as.character(Children_Home))) %>%
+    select(Total_Spending, Income, Kidhome, Teenhome, Children_Home_num, Marital_Status)
+
+set.seed(42)
+tree_model <- rpart(Total_Spending ~ .,
+    data = data_modelo,
+    control = rpart.control(cp = 0.01, maxdepth = 4, minsplit = 50)
+)
+```
+
+### 6.1. Visualización del árbol
+
+```{r fig.width=10, fig.height=6}
+rpart.plot(tree_model,
+    type = 4,
+    extra = 101,
+    fallen.leaves = TRUE,
+    shadow.col = "gray80",
+    box.palette = "BuRd",
+    main = "Árbol de decisión: predicción del gasto total\nsegún estructura familiar e ingresos",
+    cex = 0.8
+)
+```
+
+### 6.2. Importancia de las variables
+
+```{r}
+importancia <- tree_model$variable.importance
+importancia_df <- data.frame(
+    Variable = names(importancia),
+    Importancia = as.numeric(importancia)
+) %>%
+    arrange(desc(Importancia)) %>%
+    mutate(Importancia_Rel = Importancia / sum(Importancia) * 100)
+
+importancia_df
+```
+
+```{r fig.width=8, fig.height=4}
+ggplot(importancia_df, aes(x = reorder(Variable, Importancia_Rel), y = Importancia_Rel)) +
+    geom_col(fill = "#2E86AB", alpha = 0.9, width = 0.6) +
+    geom_text(aes(label = paste0(round(Importancia_Rel, 1), "%")),
+        hjust = -0.2, size = 4
+    ) +
+    coord_flip() +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+    labs(
+        title = "Importancia relativa de las variables en el modelo",
+        subtitle = "Contribución de cada variable a la predicción del gasto total",
+        x = NULL, y = "Importancia relativa (%)"
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(plot.title = element_text(face = "bold"))
+```
+
+### 6.3. Evaluación del modelo
+
+```{r}
+predicciones <- predict(tree_model, data_modelo)
+r2 <- cor(data_modelo$Total_Spending, predicciones)^2
+rmse <- sqrt(mean((data_modelo$Total_Spending - predicciones)^2))
+
+cat("R² del modelo:", round(r2, 4), "\n")
+cat("RMSE:", round(rmse, 2), "€\n")
+cat("Gasto medio real:", round(mean(data_modelo$Total_Spending), 2), "€\n")
+cat("Error relativo (RMSE / media):", round(rmse / mean(data_modelo$Total_Spending) * 100, 1), "%\n")
+```
+
+## Conclusiones
+
+Tras el análisis realizado mediante tests no paramétricos, correlaciones y un modelo de árbol de decisión, podemos extraer las siguientes conclusiones:
+
+**1. La presencia de hijos está significativamente asociada a un menor gasto total.**
+El test de Wilcoxon confirma que los hogares sin hijos presentan un gasto total significativamente superior a los hogares con hijos. Esta diferencia no se debe al azar, sino a un patrón consistente y de magnitud relevante.
+
+**2. El impacto no es uniforme entre categorías de producto.**
+Las categorías más afectadas por la presencia de hijos son el vino y la carne, que son también las de mayor gasto medio. Esto sugiere que los hogares con menores redistribuyen su presupuesto reduciendo las partidas asociadas a productos más selectos o de mayor coste unitario.
+
+**3. Existe un efecto gradual del número de hijos.**
+El test de Kruskal-Wallis y las comparaciones post-hoc de Dunn revelan que a mayor número de menores en el hogar, menor es el gasto total. La mayor diferencia se observa entre hogares sin hijos y hogares con 1 hijo, mientras que las diferencias entre 2 y 3 hijos son más modestas.
+
+**4. La correlación entre nº de hijos y gasto es negativa y significativa.**
+Las correlaciones de Spearman muestran que tanto `Kidhome` como `Teenhome` tienen una relación inversa con el gasto en todas las categorías, siendo el efecto más pronunciado en vino y carne.
+
+**5. El estado civil tiene un efecto moderado, mediado por la estructura familiar.**
+Los clientes solteros (*Single*) y divorciados (*Divorced*) tienden a gastar más que los casados (*Married*) o con pareja (*Together*). Sin embargo, esta diferencia se explica parcialmente por la menor proporción de hijos en estos grupos, lo que sugiere que la estructura familiar es el factor subyacente más relevante.
+
+**6. (Pregunta extra) Income y la presencia de hijos son los factores más determinantes.**
+El árbol de decisión identifica los ingresos y el número de menores como las variables con mayor capacidad predictiva del gasto total. La combinación de altos ingresos y ausencia de hijos define al segmento de mayor gasto, mientras que bajos ingresos con múltiples hijos corresponden al segmento de menor gasto.
+
+### Implicaciones empresariales
+
+Desde una perspectiva de *Customer Analytics*, estos resultados sugieren:
+
+-   **Segmentación**: Los hogares sin hijos con ingresos medios-altos representan el segmento de mayor valor. Las campañas dirigidas a este grupo deberían enfatizar productos *premium* (vino, carne).
+-   **Personalización**: Para hogares con hijos, conviene adaptar las ofertas hacia productos de primera necesidad o packs familiares que se ajusten a su redistribución presupuestaria.
+-   **Retención**: Los clientes con hijos, aunque gastan menos por transacción, pueden representar un valor a largo plazo si se diseñan programas de fidelización adaptados a su ciclo vital familiar.

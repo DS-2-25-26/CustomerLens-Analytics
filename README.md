@@ -29,4 +29,4 @@ Cada alumno se ha encargado de resolver un par de preguntas específicadas a con
 - ¿Aumenta el volumen de compras de forma significativa cuantos más canales utiliza el cliente?
 
 ### Francisco Javier Ruiz Rodríguez
-- ¿Cuáles son las características más frecuentes de los clientes que presentan quejas?
+- ¿Qué factores demográficos y de comportamiento caracterizan a los clientes de alto valor (alto gasto) frente a los de bajo valor?

@@ -1,0 +1,800 @@
+---
+title: "CustomerLens-Analytics. Pregunta individual Francisco Javier."
+author: "Francisco Javier Ruiz Rodríguez"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+---
+
+# Anatomía del cliente de alto valor
+
+## 1. Introducción
+
+En cualquier estrategia comercial, identificar y comprender a los **clientes más valiosos** es una prioridad. No todos los clientes generan el mismo retorno: mientras algunos concentran volúmenes de gasto elevados y sostienen las líneas de negocio más rentables, otros presentan niveles de compra marginales. Conocer qué factores demográficos, de comportamiento y de interacción distinguen a unos de otros resulta clave para diseñar acciones de fidelización, campañas de marketing y políticas comerciales.
+
+En este contexto, formulamos la siguiente pregunta de investigación:
+
+> ¿Qué factores demográficos y de comportamiento caracterizan a los clientes de alto valor (alto gasto) frente a los de bajo valor?
+
+Responder a esta cuestión es especialmente relevante porque:
+
+-   **Permite focalizar recursos**: invertir en retener clientes de alto valor es más eficiente que captación masiva indiscriminada.
+-   **Facilita la segmentación**: conocer el perfil de cada segmento permitiría diseñar acciones diferenciadas.
+-   **Complementa otros análisis del proyecto**: mientras que otros compañeros estudian la rentabilidad de los descuentos (Andrés), el canal de compra (Jaime, Pablo) o la relación entre familia y consumo (grupo), este estudio aporta una perspectiva integral de **valor del cliente**.
+
+Para ello segmentaremos los clientes en tres grupos según su gasto total (`Total_Spending`) y compararemos sus perfiles en un amplio conjunto de variables.
+
+### 1.1. Objetivos
+
+Este análisis persigue los siguientes objetivos:
+
+-   Segmentar la base de clientes en tres niveles de valor (bajo, medio, alto) según su gasto total.
+-   Describir y comparar el perfil demográfico y de comportamiento de cada segmento.
+-   Evaluar formalmente si las diferencias entre segmentos son estadísticamente significativas.
+-   Identificar las variables con mayor poder de diferenciación entre clientes de alto y bajo valor.
+-   Sintetizar un perfil tipo del cliente de alto valor para orientar decisiones estratégicas.
+
+## 2. Carga de datos y variables de trabajo
+
+Cargamos las librerías necesarias e importamos el dataset preprocesado, restaurando los tipos de las variables categóricas para mantener coherencia con el resto del proyecto.
+
+```{r message=FALSE, warning=FALSE}
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(tidyr)
+
+data <- read_csv("./data/marketing_campaign_processed.csv", show_col_types = FALSE)
+
+# Restauramos los tipos de las variables categóricas
+data$Education <- factor(
+  data$Education,
+  levels = c("Basic", "2n Cycle", "Graduation", "Master", "PhD"),
+  ordered = TRUE
+)
+data$Marital_Status <- factor(
+  data$Marital_Status,
+  levels = c("Single", "Together", "Married", "Divorced", "Widow")
+)
+```
+
+Las variables que utilizaremos abarcan todas las dimensiones del dataset:
+
+-   **Variable de segmentación**: `Total_Spending` (gasto total en los últimos 2 años).
+-   **Variables demográficas**: `Age`, `Income`, `Education`, `Marital_Status`, `Children_Home`, `Has_Children`.
+-   **Variables de gasto por categoría**: `MntWines`, `MntFruits`, `MntMeatProducts`, `MntFishProducts`, `MntSweetProducts`, `MntGoldProds`.
+-   **Variables de comportamiento de compra**: `Total_Purchases`, `NumWebPurchases`, `NumCatalogPurchases`, `NumStorePurchases`, `NumDealsPurchases`, `Deals_Ratio`, `NumWebVisitsMonth`.
+-   **Variables de campañas**: `Total_Campaigns_Accepted`, `Responded_Any_Campaign`.
+-   **Variables temporales**: `Recency`, `Tenure_Days`.
+
+```{r}
+str(data)
+```
+
+## 3. Segmentación por nivel de gasto
+
+### 3.1. Distribución del gasto total
+
+Antes de segmentar, examinamos la distribución de `Total_Spending` para decidir el criterio de corte más adecuado.
+
+```{r}
+summary(data$Total_Spending)
+```
+
+```{r fig.width=8, fig.height=4}
+ggplot(data, aes(x = Total_Spending)) +
+  geom_histogram(bins = 40, fill = "#4A90D9", color = "white", alpha = 0.85) +
+  geom_vline(aes(xintercept = median(Total_Spending)),
+             color = "#D94A4A", linetype = "dashed", linewidth = 0.8) +
+  annotate("text", x = median(data$Total_Spending) + 80, y = Inf,
+           label = paste0("Mediana = ", round(median(data$Total_Spending), 0), " €"),
+           vjust = 2, hjust = 0, color = "#D94A4A", size = 4) +
+  labs(
+    title = "Distribución del gasto total de los clientes",
+    x = "Gasto total (€)", y = "Frecuencia"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+La distribución presenta una clara **asimetría positiva** (sesgo a la derecha), lo que indica que la mayoría de los clientes gastan cantidades moderadas, mientras que un grupo reducido presenta gastos muy elevados. Este patrón es habitual en contextos de consumo y avala el uso de terciles como criterio de segmentación, ya que garantiza grupos de tamaño similar y robustez frente a valores extremos.
+
+*Nota metodológica: se opta por terciles para conseguir tamaños muestrales equilibrados que maximicen la potencia de los tests estadísticos y del modelado posterior. En un contexto de producción, una segmentación basada en el principio de Pareto (p. ej. el top 10-20 % de clientes) podría resultar más realista desde la perspectiva de negocio, aunque implicaría trabajar con grupos muy desbalanceados.*
+
+### 3.2. Creación de segmentos
+
+Dividimos la variable `Total_Spending` en tres segmentos utilizando terciles, de modo que cada grupo contenga aproximadamente un tercio de los clientes:
+
+-   **Bajo**: clientes en el tercio inferior de gasto.
+-   **Medio**: clientes en el tercio intermedio.
+-   **Alto**: clientes en el tercio superior de gasto.
+
+```{r}
+cortes <- quantile(data$Total_Spending, probs = c(0, 1/3, 2/3, 1))
+cat("Puntos de corte (terciles):", cortes, "\n")
+
+data <- data %>%
+  mutate(
+    Segmento_Gasto = cut(
+      Total_Spending,
+      breaks = cortes,
+      include.lowest = TRUE,
+      labels = c("Bajo", "Medio", "Alto")
+    )
+  )
+
+data %>% count(Segmento_Gasto)
+```
+
+## 4. Análisis descriptivo comparativo
+
+### 4.1. Variables numéricas por segmento
+
+Comparamos las medias y medianas de las principales variables numéricas entre los tres segmentos. El uso conjunto de ambas medidas permite detectar la influencia de valores extremos.
+
+```{r}
+vars_numericas <- c(
+  "Age", "Income", "Children_Home",
+  "Total_Purchases", "NumWebPurchases", "NumCatalogPurchases",
+  "NumStorePurchases", "NumDealsPurchases", "Deals_Ratio",
+  "NumWebVisitsMonth", "Recency", "Tenure_Days",
+  "Total_Campaigns_Accepted"
+)
+
+# Tamaño de cada segmento (ya mostrado en la sección anterior)
+
+resumen_segmentos <- data %>%
+  group_by(Segmento_Gasto) %>%
+  summarise(
+    across(
+      all_of(vars_numericas),
+      list(
+        Media = ~round(mean(.x, na.rm = TRUE), 2),
+        Mediana = ~round(median(.x, na.rm = TRUE), 2)
+      ),
+      .names = "{.col}__{.fn}"
+    ),
+    .groups = "drop"
+  )
+
+# Mostramos la tabla transpuesta para mayor legibilidad
+resumen_largo <- resumen_segmentos %>%
+  pivot_longer(
+    cols = -Segmento_Gasto,
+    names_to = c("Variable", "Estadistico"),
+    names_sep = "__"
+  ) %>%
+  pivot_wider(
+    names_from = c(Segmento_Gasto, Estadistico),
+    values_from = value,
+    names_sep = " - "
+  )
+
+print(resumen_largo, n = Inf, width = Inf)
+```
+
+### 4.2. Composición del gasto por categoría de producto
+
+Para entender **en qué gastan** los clientes de cada segmento, calculamos la proporción media de gasto en cada categoría respecto al gasto total.
+
+```{r}
+data <- data %>%
+  mutate(
+    Pct_Wines = ifelse(Total_Spending > 0, MntWines / Total_Spending * 100, 0),
+    Pct_Meat  = ifelse(Total_Spending > 0, MntMeatProducts / Total_Spending * 100, 0),
+    Pct_Gold  = ifelse(Total_Spending > 0, MntGoldProds / Total_Spending * 100, 0),
+    Pct_Fish  = ifelse(Total_Spending > 0, MntFishProducts / Total_Spending * 100, 0),
+    Pct_Sweet = ifelse(Total_Spending > 0, MntSweetProducts / Total_Spending * 100, 0),
+    Pct_Fruit = ifelse(Total_Spending > 0, MntFruits / Total_Spending * 100, 0)
+  )
+
+composicion <- data %>%
+  group_by(Segmento_Gasto) %>%
+  summarise(
+    Vinos = round(mean(Pct_Wines), 1),
+    Carne = round(mean(Pct_Meat), 1),
+    Oro   = round(mean(Pct_Gold), 1),
+    Pescado = round(mean(Pct_Fish), 1),
+    Dulces  = round(mean(Pct_Sweet), 1),
+    Fruta   = round(mean(Pct_Fruit), 1),
+    .groups = "drop"
+  )
+
+composicion
+```
+
+```{r fig.width=9, fig.height=5}
+composicion_long <- composicion %>%
+  pivot_longer(-Segmento_Gasto, names_to = "Categoria", values_to = "Porcentaje")
+
+ggplot(composicion_long, aes(x = Categoria, y = Porcentaje, fill = Segmento_Gasto)) +
+  geom_col(position = "dodge", width = 0.65) +
+  scale_fill_manual(values = c("Bajo" = "#E8A838", "Medio" = "#4A90D9", "Alto" = "#2ECC71")) +
+  labs(
+    title = "Composición del gasto por categoría según segmento",
+    subtitle = "Porcentaje medio del gasto total asignado a cada categoría",
+    x = "Categoría de producto", y = "% del gasto total", fill = "Segmento"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+### 4.3. Variables categóricas por segmento
+
+#### 4.3.1. Nivel educativo
+
+```{r}
+tabla_edu <- data %>%
+  count(Segmento_Gasto, Education) %>%
+  group_by(Segmento_Gasto) %>%
+  mutate(Porcentaje = round(n / sum(n) * 100, 2)) %>%
+  ungroup()
+
+tabla_edu
+```
+
+```{r fig.width=9, fig.height=4}
+ggplot(tabla_edu, aes(x = Education, y = Porcentaje, fill = Segmento_Gasto)) +
+  geom_col(position = "dodge", width = 0.6) +
+  scale_fill_manual(values = c("Bajo" = "#E8A838", "Medio" = "#4A90D9", "Alto" = "#2ECC71")) +
+  labs(
+    title = "Distribución del nivel educativo por segmento de gasto",
+    x = "Nivel educativo", y = "Porcentaje (%)", fill = "Segmento"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+La distribución educativa es bastante homogénea entre segmentos: en todos ellos predomina el nivel *Graduation*, sin diferencias marcadas. Esto sugiere que el nivel educativo, por sí solo, no es un factor relevante para diferenciar los segmentos de gasto.
+
+#### 4.3.2. Estado civil
+
+```{r}
+tabla_ms <- data %>%
+  count(Segmento_Gasto, Marital_Status) %>%
+  group_by(Segmento_Gasto) %>%
+  mutate(Porcentaje = round(n / sum(n) * 100, 2)) %>%
+  ungroup()
+
+tabla_ms
+```
+
+```{r fig.width=9, fig.height=4}
+ggplot(tabla_ms, aes(x = Marital_Status, y = Porcentaje, fill = Segmento_Gasto)) +
+  geom_col(position = "dodge", width = 0.6) +
+  scale_fill_manual(values = c("Bajo" = "#E8A838", "Medio" = "#4A90D9", "Alto" = "#2ECC71")) +
+  labs(
+    title = "Distribución del estado civil por segmento de gasto",
+    x = "Estado civil", y = "Porcentaje (%)", fill = "Segmento"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+El estado civil tampoco muestra un patrón claro de diferenciación: las proporciones de solteros, casados y en pareja son similares en los tres segmentos. Esto indica que la situación sentimental no está fuertemente asociada al nivel de gasto.
+
+#### 4.3.3. Presencia de hijos en el hogar
+
+```{r}
+tabla_hijos <- data %>%
+  mutate(Has_Children_Label = ifelse(Has_Children == 1, "Con hijos", "Sin hijos")) %>%
+  count(Segmento_Gasto, Has_Children_Label) %>%
+  group_by(Segmento_Gasto) %>%
+  mutate(Porcentaje = round(n / sum(n) * 100, 2)) %>%
+  ungroup()
+
+tabla_hijos
+```
+
+```{r fig.width=7, fig.height=4}
+ggplot(tabla_hijos, aes(x = Segmento_Gasto, y = Porcentaje, fill = Has_Children_Label)) +
+  geom_col(position = "dodge", width = 0.5) +
+  scale_fill_manual(values = c("Con hijos" = "#E8A838", "Sin hijos" = "#4A90D9")) +
+  labs(
+    title = "Presencia de hijos por segmento de gasto",
+    x = "Segmento de gasto", y = "Porcentaje (%)", fill = NULL
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+Aquí sí se aprecia una diferencia más notable: en el segmento de gasto **alto**, la proporción de clientes **sin hijos** es mayor que en los segmentos medio y bajo. Esto apunta a que la ausencia de cargas familiares podría liberar renta disponible para consumo personal.
+
+El análisis descriptivo revela diferencias claras entre los tres segmentos en la mayoría de variables. A continuación, profundizamos con visualizaciones que permiten apreciar la magnitud y distribución de estas diferencias.
+
+## 5. Visualización de variables clave
+
+### 5.1. Ingresos por segmento
+
+```{r fig.width=7, fig.height=3.5}
+ggplot(data, aes(x = Segmento_Gasto, y = Income, fill = Segmento_Gasto)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  scale_fill_manual(values = c("Bajo" = "#E8A838", "Medio" = "#4A90D9", "Alto" = "#2ECC71")) +
+  scale_y_continuous(labels = scales::comma) +
+  coord_cartesian(ylim = c(0, 200000)) +
+  labs(title = "Ingresos anuales por segmento de gasto", x = NULL, y = "Ingresos (€)") +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none")
+```
+
+Se observa una separación nítida entre segmentos: la mediana de ingresos del segmento Alto es notablemente superior a la del Bajo, con escaso solapamiento entre las cajas. Esto confirma que la **capacidad económica** es uno de los factores que más diferencia a los clientes de alto valor, aunque no es el único (como veremos en el análisis de importancia de la sección 9).
+
+### 5.2. Edad por segmento
+
+```{r fig.width=7, fig.height=4}
+ggplot(data, aes(x = Segmento_Gasto, y = Age, fill = Segmento_Gasto)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  scale_fill_manual(values = c("Bajo" = "#E8A838", "Medio" = "#4A90D9", "Alto" = "#2ECC71")) +
+  labs(title = "Edad por segmento de gasto", x = NULL, y = "Edad (años)") +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none")
+```
+
+La edad no presenta diferencias tan marcadas entre segmentos como los ingresos. Las cajas están muy solapadas, lo que indica que **la edad no es un factor determinante** para diferenciar clientes de alto y bajo valor. Todas las franjas de edad pueden presentar niveles de gasto variados.
+
+### 5.3. Compras por canal
+
+```{r fig.width=10, fig.height=5}
+vars_canal <- c("NumWebPurchases", "NumCatalogPurchases", "NumStorePurchases")
+
+data_canal <- data %>%
+  select(Segmento_Gasto, all_of(vars_canal)) %>%
+  pivot_longer(cols = all_of(vars_canal), names_to = "Canal", values_to = "Compras") %>%
+  mutate(Canal = case_when(
+    Canal == "NumWebPurchases"     ~ "Web",
+    Canal == "NumCatalogPurchases" ~ "Catálogo",
+    Canal == "NumStorePurchases"   ~ "Tienda"
+  ))
+
+ggplot(data_canal, aes(x = Canal, y = Compras, fill = Segmento_Gasto)) +
+  geom_boxplot(outlier.alpha = 0.2) +
+  scale_fill_manual(values = c("Bajo" = "#E8A838", "Medio" = "#4A90D9", "Alto" = "#2ECC71")) +
+  labs(
+    title = "Distribución de compras por canal según segmento",
+    x = "Canal", y = "Nº de compras", fill = "Segmento"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+Los tres segmentos comparten el **mismo orden de preferencia de canal**: tienda > web > catálogo. La diferencia entre segmentos no es de patrón, sino de **volumen**: los clientes de alto valor compran más en todos los canales. Sin embargo, hay un matiz relevante: en el segmento Alto, las compras por **catálogo se acercan en volumen a las de web**, mientras que en los segmentos Medio y Bajo la brecha entre ambos canales es mayor. Esto indica que los clientes de alto valor tienen una preferencia *relativa* mayor por el catálogo en comparación con los demás segmentos, aunque —como se analiza en la sección 9— parte de esta relación es mecánica: quien compra más veces, gasta más.
+
+### 5.4. Dependencia de descuentos (Deals_Ratio)
+
+```{r fig.width=7, fig.height=4}
+ggplot(data, aes(x = Segmento_Gasto, y = Deals_Ratio, fill = Segmento_Gasto)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  scale_fill_manual(values = c("Bajo" = "#E8A838", "Medio" = "#4A90D9", "Alto" = "#2ECC71")) +
+  labs(
+    title = "Dependencia de descuentos por segmento de gasto",
+    x = NULL, y = "Proporción de compras con descuento"
+  ) +
+  coord_cartesian(ylim = c(0, 1)) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none")
+```
+
+Se aprecia un patrón interesante: los clientes de gasto **bajo** presentan la mayor proporción de compras con descuento, mientras que los de gasto **alto** recurren menos a ofertas. Esto podría indicar que los clientes de alto valor son menos sensibles al precio o que su cesta de compra habitual (vinos, carne) se ve menos afectada por promociones.
+
+### 5.5. Visitas web mensuales
+
+```{r fig.width=7, fig.height=4}
+ggplot(data, aes(x = Segmento_Gasto, y = NumWebVisitsMonth, fill = Segmento_Gasto)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  scale_fill_manual(values = c("Bajo" = "#E8A838", "Medio" = "#4A90D9", "Alto" = "#2ECC71")) +
+  labs(
+    title = "Visitas web mensuales por segmento de gasto",
+    x = NULL, y = "Nº visitas/mes"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none")
+```
+
+Paradójicamente, los clientes de gasto **bajo** visitan **más** la web que los de gasto alto. Esto podría reflejar un comportamiento más informacional o comparativo (buscar ofertas, comparar productos) frente al comportamiento más decisivo de los clientes de alto valor, que compran directamente por catálogo o en tienda.
+
+### 5.6. Campañas aceptadas
+
+```{r fig.width=8, fig.height=4}
+tasa_campanas <- data %>%
+  group_by(Segmento_Gasto) %>%
+  summarise(
+    Tasa_respuesta = round(mean(Responded_Any_Campaign) * 100, 1),
+    Media_campannas = round(mean(Total_Campaigns_Accepted), 2),
+    .groups = "drop"
+  )
+
+ggplot(tasa_campanas, aes(x = Segmento_Gasto, y = Tasa_respuesta, fill = Segmento_Gasto)) +
+  geom_col(width = 0.5) +
+  geom_text(aes(label = paste0(Tasa_respuesta, "%")), vjust = -0.5, size = 4.5) +
+  scale_fill_manual(values = c("Bajo" = "#E8A838", "Medio" = "#4A90D9", "Alto" = "#2ECC71")) +
+  labs(
+    title = "Tasa de respuesta a campañas por segmento de gasto",
+    subtitle = "% de clientes que aceptaron al menos una campaña",
+    x = NULL, y = "Tasa de respuesta (%)"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none") +
+  ylim(0, max(tasa_campanas$Tasa_respuesta) * 1.15)
+```
+
+Descriptivamente, los clientes de alto valor muestran una tasa de respuesta a campañas algo superior. No obstante, como veremos en la sección 9 de importancia de variables, este factor tiene **escaso poder discriminante** entre segmentos: la mayoría de clientes en todos los grupos no acepta campañas, por lo que la diferencia, aunque real, no es un rasgo distintivo fuerte del cliente de alto valor.
+
+### 5.7. Relación entre ingresos y gasto total
+
+```{r fig.width=8, fig.height=5}
+ggplot(data, aes(x = Income, y = Total_Spending, color = Segmento_Gasto)) +
+  geom_point(alpha = 0.4, size = 1.5) +
+  geom_smooth(aes(color = NULL), method = "loess", se = FALSE,
+              linewidth = 1, linetype = "dashed", color = "black") +
+  scale_color_manual(values = c("Bajo" = "#E8A838", "Medio" = "#4A90D9", "Alto" = "#2ECC71")) +
+  scale_x_continuous(labels = scales::comma) +
+  coord_cartesian(xlim = c(0, 150000)) +
+  labs(
+    title = "Relación entre ingresos y gasto total",
+    x = "Ingresos anuales (€)", y = "Gasto total (€)", color = "Segmento"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+El *scatter plot* muestra una relación positiva clara entre ingresos y gasto total, especialmente visible en la curva LOESS global. Sin embargo, dentro de cada segmento, la dispersión es considerable: para un mismo nivel de ingresos, los clientes pueden pertenecer a segmentos distintos. Esto refuerza la idea de que **los ingresos, por sí solos, no determinan completamente el nivel de gasto**.
+
+## 6. Análisis inferencial
+
+### 6.1. Planteamiento estadístico
+
+Para determinar si las diferencias observadas entre segmentos son estadísticamente significativas, aplicamos los siguientes tests:
+
+-   **Variables numéricas**: test de **Kruskal-Wallis** (alternativa no paramétrica al ANOVA de un factor), adecuado para comparar tres o más grupos sin asumir normalidad.
+-   **Variables categóricas**: test **Chi-cuadrado de independencia**, que evalúa si la distribución de una variable categórica es independiente del segmento de gasto.
+
+Se adopta un nivel de significación $\alpha = 0.05$.
+
+### 6.2. Tests para variables numéricas (Kruskal-Wallis)
+
+```{r}
+resultados_kw <- data.frame(
+  Variable = vars_numericas,
+  Estadistico = NA_real_,
+  p_valor = NA_real_,
+  stringsAsFactors = FALSE
+)
+
+for (i in seq_along(vars_numericas)) {
+  v <- vars_numericas[i]
+  test <- kruskal.test(reformulate("Segmento_Gasto", response = v), data = data)
+  resultados_kw$Estadistico[i] <- round(test$statistic, 2)
+  resultados_kw$p_valor[i] <- round(test$p.value, 6)
+}
+
+resultados_kw$Significativa <- ifelse(resultados_kw$p_valor < 0.05, "Sí", "No")
+
+resultados_kw
+```
+
+```{r}
+vars_significativas <- resultados_kw$Variable[resultados_kw$Significativa == "Sí"]
+```
+
+### 6.3. Tests para variables categóricas (Chi-cuadrado)
+
+```{r}
+cat("=== Education vs Segmento_Gasto ===\n")
+tabla_edu_test <- table(data$Education, data$Segmento_Gasto)
+test_edu <- chisq.test(tabla_edu_test)
+print(test_edu)
+
+cat("\n=== Marital_Status vs Segmento_Gasto ===\n")
+tabla_ms_test <- table(data$Marital_Status, data$Segmento_Gasto)
+test_ms <- chisq.test(tabla_ms_test)
+print(test_ms)
+
+cat("\n=== Has_Children vs Segmento_Gasto ===\n")
+tabla_hijos_test <- table(data$Has_Children, data$Segmento_Gasto)
+test_hijos <- chisq.test(tabla_hijos_test)
+print(test_hijos)
+```
+
+### 6.4. Resumen de significación estadística
+
+```{r}
+cat("========================================\n")
+cat("RESUMEN DE SIGNIFICACIÓN ESTADÍSTICA\n")
+cat("========================================\n\n")
+
+cat("--- Variables numéricas (Kruskal-Wallis) ---\n")
+cat("Significativas:\n")
+for (v in vars_significativas) {
+  p <- resultados_kw$p_valor[resultados_kw$Variable == v]
+  cat(paste0("  ✓ ", v, " (p = ", p, ")\n"))
+}
+
+vars_no_sig <- resultados_kw$Variable[resultados_kw$Significativa == "No"]
+if (length(vars_no_sig) > 0) {
+  cat("No significativas:\n")
+  for (v in vars_no_sig) {
+    p <- resultados_kw$p_valor[resultados_kw$Variable == v]
+    cat(paste0("  ✗ ", v, " (p = ", p, ")\n"))
+  }
+}
+
+cat("\n--- Variables categóricas (Chi-cuadrado) ---\n")
+cat(paste0("  Education:      p = ", format.pval(test_edu$p.value, digits = 4),
+           " → ", ifelse(test_edu$p.value < 0.05, "Significativa ✓", "No significativa ✗"), "\n"))
+cat(paste0("  Marital_Status: p = ", format.pval(test_ms$p.value, digits = 4),
+           " → ", ifelse(test_ms$p.value < 0.05, "Significativa ✓", "No significativa ✗"), "\n"))
+cat(paste0("  Has_Children:   p = ", format.pval(test_hijos$p.value, digits = 4),
+           " → ", ifelse(test_hijos$p.value < 0.05, "Significativa ✓", "No significativa ✗"), "\n"))
+```
+
+## 7. Perfil tipo del cliente de alto valor
+
+A partir de los resultados descriptivos e inferenciales, sintetizamos las características que definen al cliente de alto valor (segmento **Alto**), contrastándolas con el segmento **Bajo**.
+
+```{r}
+perfil_comparativo <- data %>%
+  filter(Segmento_Gasto %in% c("Bajo", "Alto")) %>%
+  group_by(Segmento_Gasto) %>%
+  summarise(
+    n = as.character(n()),
+    Gasto_total_medio = as.character(round(mean(Total_Spending), 0)),
+    Ingreso_medio = as.character(round(mean(Income, na.rm = TRUE), 0)),
+    Edad_media = as.character(round(mean(Age), 1)),
+    Hijos_media = as.character(round(mean(Children_Home), 2)),
+    Pct_sin_hijos = as.character(round(mean(Has_Children == 0) * 100, 1)),
+    Compras_totales = as.character(round(mean(Total_Purchases), 1)),
+    Compras_catalogo = as.character(round(mean(NumCatalogPurchases), 1)),
+    Compras_tienda = as.character(round(mean(NumStorePurchases), 1)),
+    Compras_web = as.character(round(mean(NumWebPurchases), 1)),
+    Deals_Ratio = as.character(round(mean(Deals_Ratio), 3)),
+    Visitas_web_mes = as.character(round(mean(NumWebVisitsMonth), 1)),
+    Tasa_campanna = as.character(round(mean(Responded_Any_Campaign) * 100, 1)),
+    Recencia_media = as.character(round(mean(Recency), 1)),
+    Educacion_moda = names(sort(table(Education), decreasing = TRUE))[1],
+    Estado_civil_moda = names(sort(table(Marital_Status), decreasing = TRUE))[1],
+    .groups = "drop"
+  )
+
+perfil_largo <- perfil_comparativo %>%
+  pivot_longer(-Segmento_Gasto, names_to = "Caracteristica", values_to = "Valor") %>%
+  pivot_wider(names_from = Segmento_Gasto, values_from = Valor)
+
+perfil_largo
+```
+
+## 8. Árbol de decisión (CART)
+
+### 8.1. Justificación metodológica
+
+El análisis descriptivo e inferencial evalúa cada variable **por separado**. Para capturar **interacciones** entre variables y obtener reglas de clasificación interpretables, entrenamos un **árbol de decisión CART** (*Classification and Regression Tree*). Este enfoque presenta ventajas frente a otras alternativas:
+
+-   No requiere discretizar variables continuas, por lo que no se pierde información.
+-   Encuentra automáticamente los **puntos de corte óptimos** en cada variable.
+-   Genera un **diagrama de flujo** visual, fácilmente comunicable a *stakeholders* no técnicos.
+
+Limitamos la profundidad del árbol a 4 niveles para mantener la interpretabilidad.
+
+### 8.2. Entrenamiento del modelo
+
+```{r message=FALSE, warning=FALSE}
+library(rpart)
+library(rpart.plot)
+
+set.seed(42)
+
+vars_arbol <- c(
+  "Age", "Income", "Children_Home",
+  "Deals_Ratio", "NumWebVisitsMonth",
+  "Recency", "Tenure_Days"
+)
+
+data_tree <- data %>%
+  select(Segmento_Gasto, all_of(vars_arbol)) %>%
+  na.omit()
+
+arbol <- rpart(
+  Segmento_Gasto ~ .,
+  data = data_tree,
+  method = "class",
+  control = rpart.control(maxdepth = 4, cp = 0.01)
+)
+
+arbol
+```
+
+### 8.3. Visualización del árbol
+
+```{r fig.width=12, fig.height=7}
+rpart.plot(
+  arbol,
+  type = 4,
+  extra = 104,
+  fallen.leaves = TRUE,
+  roundint = FALSE,
+  main = "Árbol de clasificación de segmentos de gasto",
+  box.palette = list("#E8A838", "#4A90D9", "#2ECC71")
+)
+```
+
+### 8.4. Interpretación
+
+```{r}
+printcp(arbol)
+```
+
+El árbol de decisión confirma que **`Income` es la variable más discriminante** desde una perspectiva de perfil, ya que es elegida como raíz del árbol. A partir del primer corte, se definen tres grandes zonas:
+
+-   **Ingresos < 39.550 €**: la gran mayoría de estos clientes pertenecen al segmento **Bajo** (81 %). Solo aquellos con un `Deals_Ratio` muy bajo (< 0.15) se desvían hacia el segmento Medio, lo que refuerza que la baja dependencia de descuentos es una señal de mayor valor incluso en rentas bajas.
+-   **Ingresos entre 39.550 € y 66.534 €**: esta es la **zona de transición**, donde el segmento depende de variables secundarias. Los clientes con mayor antigüedad (`Tenure_Days` > 396) tienden a ser Medio, mientras que los más recientes se clasifican como Bajo si usan mucho los descuentos. En la franja 52.000–66.500 €, los clientes con alta antigüedad y **menos de 2 hijos** alcanzan el segmento Alto (70 %), pero con 2 o más hijos se quedan en Medio.
+-   **Ingresos ≥ 66.534 €**: segmento **Alto** de forma casi unánime (87 %), independientemente de las demás variables.
+
+Este análisis revela interacciones que los tests univariantes no pueden capturar: por ejemplo, la combinación *Income + Tenure_Days + Children_Home* define perfiles de forma mucho más precisa que cualquiera de estas variables por separado. Las reglas del árbol son directamente traducibles a criterios de segmentación comercial.
+
+## 9. Importancia de variables (Random Forest)
+
+### 9.1. Motivación
+
+Los tests de Kruskal-Wallis y Chi-cuadrado realizados en la sección 6 permiten determinar **si** una variable difiere significativamente entre segmentos, pero no cuantifican **cuánto** contribuye cada una a la diferenciación. Para resolver esta cuestión, entrenamos un modelo de **Random Forest** con la variable objetivo `Segmento_Gasto` y extraemos la importancia de cada variable predictora mediante el índice **Mean Decrease Gini**, que mide cuánto contribuye cada variable a la pureza de los nodos de los árboles de decisión.
+
+Este enfoque es especialmente adecuado porque:
+
+-   No requiere supuestos de distribución.
+-   Captura relaciones no lineales e interacciones entre variables.
+-   Proporciona un ranking cuantitativo e interpretable de las variables más discriminantes.
+
+### 9.2. Entrenamiento del modelo
+
+```{r message=FALSE, warning=FALSE}
+library(randomForest)
+
+set.seed(42)
+
+vars_modelo <- c(
+  "Age", "Income", "Children_Home",
+  "NumWebPurchases", "NumCatalogPurchases", "NumStorePurchases",
+  "NumDealsPurchases", "Deals_Ratio", "NumWebVisitsMonth",
+  "Recency", "Tenure_Days", "Total_Campaigns_Accepted",
+  "Responded_Any_Campaign"
+)
+
+data_rf <- data %>%
+  select(Segmento_Gasto, all_of(vars_modelo)) %>%
+  na.omit()
+
+rf_model <- randomForest(
+  Segmento_Gasto ~ .,
+  data = data_rf,
+  ntree = 500,
+  importance = TRUE
+)
+
+rf_model
+```
+
+*NOTA: No se incluyen las variables de gasto por categoría (`MntWines`, `MntMeatProducts`, etc.) ni `Total_Purchases`, ya que son componentes directos de `Total_Spending`. Sí se mantienen las variables de canal de compra (`NumCatalogPurchases`, etc.) para cuantificar su importancia relativa, aunque — como se discute en la sección 9.5 — estas actúan parcialmente como proxy del gasto y se entrena un segundo modelo sin ellas para obtener una perspectiva puramente demográfica.*
+
+### 9.3. Ranking de importancia
+
+```{r fig.width=9, fig.height=5}
+importancia <- importance(rf_model, type = 2)
+df_imp <- data.frame(
+  Variable = rownames(importancia),
+  MeanDecreaseGini = importancia[, 1]
+)
+df_imp <- df_imp %>% arrange(desc(MeanDecreaseGini))
+
+ggplot(df_imp, aes(x = reorder(Variable, MeanDecreaseGini), y = MeanDecreaseGini)) +
+  geom_col(fill = "#4A90D9", width = 0.6) +
+  coord_flip() +
+  labs(
+    title = "Importancia de variables para diferenciar segmentos de gasto",
+    subtitle = "Random Forest — Mean Decrease Gini",
+    x = NULL, y = "Mean Decrease Gini"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+### 9.4. Interpretación
+
+```{r}
+df_imp
+```
+
+El ranking de importancia permite identificar cuáles son las variables con mayor poder discriminante entre los tres segmentos de gasto. Las variables con mayor *Mean Decrease Gini* son aquellas que, al ser utilizadas para dividir los nodos del árbol, producen los grupos más homogéneos en términos de segmento de gasto.
+
+Un resultado que merece discusión es que las variables de **canal de compra** (`NumCatalogPurchases`, `NumStorePurchases`, `NumWebPurchases`) se sitúan por encima de `Income` en el ranking. Esto se explica por varias razones:
+
+-   **El Mean Decrease Gini mide poder de separación, no correlación**. Las compras por catálogo y en tienda tienen una relación más directa y mecánica con el gasto total: quien compra más veces tiende a gastar más. Son casi un *proxy* del propio gasto, lo cual les otorga un poder de separación muy elevado entre los tres segmentos.
+-   **Los ingresos son condición necesaria pero no suficiente**. Tener ingresos altos no implica gastar mucho: existen clientes con alta capacidad económica que presentan niveles de gasto moderados. En cambio, un cliente con muchas compras por catálogo tiene una probabilidad muy alta de pertenecer al segmento de gasto alto. Por eso el modelo encuentra que las compras por canal separan los grupos de forma más *limpia* que los ingresos.
+-   **Income sigue siendo la 3ª variable más importante**, lo cual confirma su relevancia como factor determinante, aunque no sea el más discriminante en un contexto multivariante.
+
+De forma esquemática, el ranking se organiza en tres zonas:
+
+-   **Zona alta (Mean Decrease Gini > 200)**: `NumCatalogPurchases`, `NumStorePurchases`, `Income` y `NumWebPurchases`. Estas son las variables que más diferencian a los segmentos: representan el **comportamiento de compra activo** y la **capacidad económica**.
+-   **Zona media (40 – 130)**: `Deals_Ratio`, `Tenure_Days`, `NumWebVisitsMonth`, `NumDealsPurchases`, `Recency`, `Children_Home` y `Age`. Funcionan como **variables moderadoras**: reflejan el estilo de vida, la relación con la empresa y el perfil demográfico del cliente.
+-   **Zona baja (< 15)**: `Total_Campaigns_Accepted` y `Responded_Any_Campaign`. Aceptar o no campañas de marketing **no permite diferenciar bien** entre clientes de alto y bajo valor, lo que sugiere que la receptividad a campañas no es un rasgo exclusivo de un segmento.
+
+Este resultado complementa los tests inferenciales de la sección 6: mientras que los tests confirman si una variable es *estadísticamente significativa*, el Random Forest cuantifica su **relevancia relativa** en un contexto multivariante donde todas las variables compiten simultáneamente por explicar las diferencias entre segmentos.
+
+### 9.5. Modelo alternativo: solo variables de perfil
+
+El primer modelo incluye variables de canal de compra (`NumCatalogPurchases`, `NumStorePurchases`, `NumWebPurchases`) que son parcialmente un *proxy* del propio gasto total (quien compra más veces, gasta más). Esto explica su posición dominante y el bajo error OOB. Para aislar el poder predictivo de las **variables puramente demográficas y de perfil**, entrenamos un segundo modelo excluyendo los canales de compra y variables derivadas de ellos.
+
+```{r}
+set.seed(42)
+
+vars_perfil <- c(
+  "Age", "Income", "Children_Home",
+  "Deals_Ratio", "NumWebVisitsMonth",
+  "Recency", "Tenure_Days"
+)
+
+data_rf2 <- data %>%
+  select(Segmento_Gasto, all_of(vars_perfil)) %>%
+  na.omit()
+
+rf_perfil <- randomForest(
+  Segmento_Gasto ~ .,
+  data = data_rf2,
+  ntree = 500,
+  importance = TRUE
+)
+
+rf_perfil
+```
+
+```{r fig.width=9, fig.height=4}
+imp2 <- importance(rf_perfil, type = 2)
+df_imp2 <- data.frame(
+  Variable = rownames(imp2),
+  MeanDecreaseGini = imp2[, 1]
+) %>% arrange(desc(MeanDecreaseGini))
+
+ggplot(df_imp2, aes(x = reorder(Variable, MeanDecreaseGini), y = MeanDecreaseGini)) +
+  geom_col(fill = "#2ECC71", width = 0.6) +
+  coord_flip() +
+  labs(
+    title = "Importancia de variables (solo perfil demográfico)",
+    subtitle = "Random Forest sin variables de canal de compra",
+    x = NULL, y = "Mean Decrease Gini"
+  ) +
+  theme_minimal(base_size = 13)
+```
+
+Al eliminar las variables de canal, el error OOB aumenta sustancialmente, lo que confirma que parte de la capacidad predictiva del primer modelo se debía a la relación mecánica entre canales y gasto. En este segundo modelo, **`Income` asciende al primer puesto**, seguido de variables como `Deals_Ratio`, `NumWebVisitsMonth` y `Tenure_Days`. Esto revela que, desde una perspectiva puramente demográfica y de estilo de vida, la **capacidad económica** es efectivamente el factor más determinante del nivel de gasto.
+
+La comparación entre ambos modelos aporta una visión más matizada: las variables de canal son los mejores *clasificadores* (modelo 1), pero cuando nos preguntamos qué *caracteriza inherentemente* a un cliente de alto valor, la respuesta apunta a los ingresos, la baja dependencia de descuentos y la menor frecuencia de visitas web (modelo 2).
+
+## 10. Implicaciones de negocio
+
+Los hallazgos de este estudio pueden traducirse en acciones comerciales concretas:
+
+1.  **Optimización de la estrategia web**: los clientes de gasto bajo visitan más la web (6-7 visitas/mes) pero compran menos, mientras que los de alto valor la visitan menos (~4) y compran por catálogo/tienda. Esto sugiere que la web actual atrae a *cazadores de ofertas* pero no convierte a clientes Premium. Se recomienda revisar la UX/UI de la tienda online para destacar productos de alto valor (vinos, carne Premium) y crear una experiencia de compra diferenciada.
+
+2.  **Política de descuentos segmentada**: los clientes de alto valor presentan un `Deals_Ratio` significativamente más bajo. Aplicar descuentos genéricos a este segmento supone una **pérdida de margen innecesaria**, ya que comprarían igualmente. Se recomienda excluir al segmento alto de las promociones masivas y sustituirlas por acciones de valor añadido (envío gratuito, acceso anticipado, catálogos exclusivos).
+
+3.  **Potenciación del canal catálogo**: el catálogo es el canal más asociado al cliente de alto valor. Invertir en catálogos físicos personalizados y en experiencias en tienda (*tastings*, eventos VIP) podría reforzar la retención de este segmento.
+
+4.  **Captación dirigida**: las reglas del árbol de decisión (sección 8) proporcionan perfiles concretos para campañas de captación. Los clientes con ingresos altos, sin hijos y baja dependencia de descuentos son los candidatos más probables a convertirse en clientes de alto valor.
+
+## 11. Conclusiones
+
+A lo largo de este análisis hemos abordado la pregunta: *¿Qué factores demográficos y de comportamiento caracterizan a los clientes de alto valor frente a los de bajo valor?*
+
+Los principales hallazgos se resumen a continuación:
+
+1.  **Segmentación robusta**: la división por terciles de `Total_Spending` ha generado tres grupos de tamaño similar, permitiendo comparaciones equilibradas y con suficiente potencia estadística.
+
+2.  **Convergencia de técnicas en `Income` como factor clave**: tanto el Random Forest de perfil como el árbol de decisión CART coinciden de forma independiente en que **`Income` es la variable demográfica más determinante**. El RF lo sitúa en primer lugar por Mean Decrease Gini y el CART lo elige como raíz del árbol (primer corte: 52.199 €). Esta convergencia entre dos algoritmos distintos refuerza la robustez del hallazgo. El primer Random Forest (con variables de canal) muestra que `NumCatalogPurchases` y `NumStorePurchases` son los mejores *clasificadores*, pero esto se debe a su relación mecánica con el gasto, lo que motivó el entrenamiento de un segundo modelo sin estas variables.
+
+3.  **Perfiles jerárquicos (CART)**: el árbol de decisión identifica tres zonas de ingreso (< 39.550 €, 39.550–66.534 €, ≥ 66.534 €) y revela interacciones entre variables: en la zona de transición, `Deals_Ratio`, `Tenure_Days` y `Children_Home` determinan el segmento final. Estas reglas son directamente traducibles a criterios de segmentación comercial.
+
+4.  **Composición del gasto**: los clientes de alto valor concentran su gasto en categorías de mayor valor como **vinos** y **carne**, mientras que los de bajo valor presentan una distribución más uniforme.
+
+5.  **Estructura familiar**: la presencia de hijos en el hogar se asocia con un menor nivel de gasto. Los clientes de alto valor tienden a tener menos hijos, lo que podría reflejar una mayor renta disponible para consumo personal.
+
+6.  **Comportamiento web paradójico**: los clientes de gasto bajo visitan **más** la web que los de gasto alto. Esto sugiere un perfil informacional y comparativo, frente al comportamiento más decisivo de los clientes de alto valor.
+
+7.  **Campañas de marketing: diferencia descriptiva, bajo poder discriminante**: si bien los clientes de alto valor presentan una tasa de respuesta a campañas ligeramente superior, ambos modelos Random Forest sitúan esta variable en la **zona de menor importancia**.
+
+8.  **Limitaciones**:
+    -   La segmentación por terciles es una simplificación; en producción, una segmentación tipo Pareto (top 10-20 %) sería más realista.
+    -   La relación entre las variables explicativas y el gasto es **asociativa**, no causal.
+    -   La variable `Total_Spending` fue creada como suma del gasto en seis categorías, por lo que las variables de canal de compra son en parte un *proxy* del propio gasto. La inclusión de un segundo modelo sin estas variables mitiga, pero no elimina completamente, este sesgo.
+
+En conjunto, este estudio proporciona un marco analítico multidimensional —descriptivo, inferencial y predictivo— para que la empresa pueda identificar, retener y potenciar a sus clientes más valiosos, diseñando estrategias diferenciadas según el perfil de valor.
