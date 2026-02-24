@@ -27,6 +27,7 @@ Cada alumno se ha encargado de resolver un par de preguntas específicadas a con
 
 ### Pablo Oliva Muñoz
 - ¿Aumenta el volumen de compras de forma significativa cuantos más canales utiliza el cliente?
+- ¿Ese aumento de gasto es una simple suma de ventas independientes, o existe un efecto multiplicador (sinergias) al combinar canales?
 
 ### Francisco Javier Ruiz Rodríguez
 - ¿Qué factores demográficos y de comportamiento caracterizan a los clientes de alto valor (alto gasto) frente a los de bajo valor?
