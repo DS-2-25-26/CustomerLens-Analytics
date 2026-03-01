@@ -1,0 +1,383 @@
+---
+title: "CustomerLens-Analytics. 2º pregunta individual."
+author: "Jaime Linares Barrera"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    # number_sections: true
+---
+
+# A mayor educación, ¿mayor tentación?
+
+## 1. Introducción
+
+En un entorno empresarial cada vez más orientado al **marketing basado en datos**, comprender qué factores explican la **respuesta de los clientes a campañas comerciales** resulta fundamental para mejorar la eficiencia de las acciones promocionales. Las organizaciones no solo buscan incrementar la tasa de conversión puntual, sino también optimizar la segmentación de audiencias, reducir costes de impacto y diseñar campañas más alineadas con las características y preferencias de cada perfil de cliente.
+
+Dentro de los enfoques de segmentación, la **segmentación demográfica** continúa siendo una herramienta ampliamente utilizada en analítica de clientes, ya que variables como edad, ingresos u **nivel educativo** suelen correlacionarse con preferencias, necesidades y patrones de comportamiento ante estímulos de marketing [[1, 2]](#bibliografía). En particular, el nivel educativo puede influir en la forma en que el cliente **procesa información**, interpreta mensajes comerciales, valora propuestas o reacciona ante incentivos, especialmente en contextos donde la atención y la toma de decisiones no siguen un patrón lineal [[3]](#bibliografía).
+
+En este contexto surge la siguiente pregunta de investigación:
+
+> ¿Hay relación entre el nivel educativo del cliente y su respuesta a las campañas?
+
+Responder a esta cuestión resulta relevante desde una perspectiva estratégica. Si existieran diferencias sistemáticas de respuesta por nivel educativo, la empresa podría ajustar la **propuesta de valor**, el **tipo de mensaje** o incluso la **segmentación** de campañas para maximizar su efectividad. Además, el análisis puede ayudar a identificar si la educación actúa como un factor directo o si su efecto aparece principalmente dentro de patrones más complejos (por ejemplo, combinada con ingresos, edad, o comportamiento de compra).
+
+En este análisis utilizaremos la variable `Education`, definida como un factor ordenado (*Basic* \< *2n Cycle* \< *Graduation* \< *Master* \< *PhD*), y la relacionaremos con variables que recogen el comportamiento ante campañas: `Response` (aceptación de la última campaña), `Total_Campaigns_Accepted` (número total de campañas históricas aceptadas) y los indicadores individuales `AcceptedCmp1` a `AcceptedCmp5.` A partir de ellas, se evaluará si existen diferencias globales, si determinadas campañas atraen más a perfiles educativos concretos y si emergen **segmentos diferenciados** de comportamiento en los que la educación tenga un papel relevante.
+
+### 1.1. Objetivos
+
+El estudio persigue los siguientes objetivos:
+
+-   **Analizar descriptivamente** la respuesta a campañas en función del nivel educativo, examinando tanto la aceptación de la última campaña como la intensidad de aceptación histórica.
+-   **Evaluar formalmente** si existen diferencias estadísticamente significativas en la distribución de `Total_Campaigns_Accepted` entre niveles educativos (enfoque inferencial).
+-   **Modelizar y explicar** la respuesta a la última campaña mediante un enfoque supervisado (árbol de decisión), para determinar si `Education` aporta capacidad predictiva cuando compite con otras variables relevantes del cliente.
+-   **Identificar patrones específicos** entre niveles educativos y campañas concretas mediante **reglas de asociación**, con el fin de detectar afinidades o “sesgos” de aceptación por campaña.
+-   **Explorar la existencia de perfiles (segmentos) diferenciados** de comportamiento ante campañas mediante **clustering**, y analizar la distribución del nivel educativo dentro de dichos segmentos.
+
+De este modo, el análisis no solo permitirá determinar si existe relación entre educación y respuesta, sino también comprender **cómo se manifiesta**, si se concentra en campañas concretas y si estructura perfiles de cliente con comportamiento claramente diferenciado.
+
+## 2. Definición metodológica y planteamiento analítico
+
+Antes de aplicar técnicas de inferencia o modelización, resulta fundamental definir con precisión la naturaleza de las variables implicadas y justificar el enfoque metodológico del análisis. En este estudio nos interesa evaluar si el **nivel educativo** del cliente está relacionado con su **comportamiento de respuesta a campañas**, entendiendo dicha respuesta no solo como un evento binario (aceptar o no una campaña), sino también como un patrón de aceptación acumulado y potencialmente segmentable.
+
+Dado que la pregunta de investigación se puede abordar desde distintos ángulos, se adoptará un enfoque **multitécnica y complementario**, combinando métodos estadísticos, modelos de aprendizaje supervisado, minería de patrones y segmentación no supervisada. Esto permite obtener una visión más completa y robusta que el análisis bivariante clásico, especialmente en contextos donde las relaciones pueden ser indirectas o depender de la combinación de varios factores.
+
+### 2.1. Naturaleza de las variables
+
+Para abordar la pregunta de investigación, es necesario caracterizar formalmente las variables que intervendrán en el análisis:
+
+#### [Variable explicativa principal: nivel educativo]{.underline}
+
+-   `Education`: variable **cualitativa ordinal**, definida como un factor ordenado con los siguientes niveles: *Basic \< 2n Cycle \< Graduation \< Master \< PhD*.
+
+El carácter ordinal de `Education` es relevante, ya que implica que existe un orden inherente entre categorías. Por tanto, aunque se trate de una variable cualitativa, no debe interpretarse simplemente como nominal: ciertos enfoques (p. ej., comparaciones entre distribuciones) deben respetar esa estructura ordenada.
+
+#### [Variables respuesta: comportamiento ante campañas]{.underline}
+
+El comportamiento ante campañas se operacionaliza mediante varias variables complementarias:
+
+-   `Response`: variable **cualitativa binaria**, donde:
+    -   1: el cliente aceptó la última campaña.
+    -   0: el cliente no aceptó la última campaña.
+
+Esta variable permite analizar la respuesta a campañas desde un enfoque puntual y binario (un objetivo típico en analítica de marketing: estimar aceptación de una campaña concreta).
+
+-   `Total_Campaigns_Accepted`: variable cuantitativa discreta de conteo, que representa el número total de campañas aceptadas por el cliente (campañas históricas).
+
+Esta variable permite estudiar la intensidad o propensión acumulada a aceptar campañas, más allá de una decisión puntual.
+
+-   `AcceptedCmp1` ... `AcceptedCmp5`: variables **cualitativas binarias** que indican aceptación individual de cada campaña histórica.
+
+Estas variables permiten detectar si existen campañas concretas con comportamientos diferenciados según nivel educativo.
+
+#### [Variables adicionales para análisis multivariante]{.underline}
+
+Aunque el foco principal es la educación, es razonable considerar que la respuesta a campañas puede depender también de otros factores del cliente. Por ello, en ciertos apartados se utilizarán variables complementarias con potencial influencia:
+
+-   **Sociodemográficas y contexto**: `Income`, `Age`, `Has_Children`, `Marital_Status`.
+-   **Comportamiento y propensión a promociones**: `Deals_Ratio`, `NumDealsPurchases`, `Recency`.
+-   **Canales e interacción**: `NumWebPurchases`, `NumWebVisitsMonth`, `Total_Purchases`.
+
+Estas variables serán especialmente útiles en la fase de **árbol de decisión** y en **clustering**, donde el objetivo no es únicamente evaluar una asociación simple, sino entender perfiles de respuesta.
+
+### 2.2. Enfoque analítico
+
+La pregunta de investigación puede reformularse de manera más operativa como:
+
+> ¿Presentan los distintos niveles educativos patrones distintos de respuesta a campañas, tanto en términos de aceptación puntual, como de intensidad histórica y segmentación de comportamiento?
+
+Para responder de forma robusta, se emplearán cuatro enfoques complementarios, cada uno orientado a un aspecto específico de la pregunta.
+
+#### 2.2.1. Enfoque inferencial: diferencias en intensidad de respuesta (Kruskal–Wallis)
+
+En primer lugar, evaluaremos si existen diferencias estadísticamente significativas en la **intensidad de aceptación** de campañas según el nivel educativo. Para ello utilizaremos como variable respuesta el conteo `Total_Campaigns_Accepted` y compararemos su distribución entre categorías de `Education.`
+
+Dado que `Total_Campaigns_Accepted` es una variable discreta y puede no cumplir supuestos de normalidad y homocedasticidad, se empleará el contraste no paramétrico **Kruskal–Wallis**, adecuado para comparar más de dos grupos independientes cuando la variable respuesta no se distribuye normalmente.
+
+Las hipótesis del contraste son:
+
+-   H₀: La distribución de `Total_Campaigns_Accepted` es la misma para todos los niveles educativos.
+-   H₁: Al menos un nivel educativo presenta una distribución distinta.
+
+En caso de obtener significación estadística, se complementará el análisis con comparaciones post-hoc para identificar entre qué niveles se producen las diferencias.
+
+Este enfoque aporta una respuesta formal a la idea de: *“¿Aceptan más campañas, en promedio o en distribución, los clientes con mayor educación?”*.
+
+#### 2.2.2. Enfoque supervisado: explicación/predicción de respuesta puntual (árbol de decisión)
+
+A continuación, abordaremos la aceptación de la última campaña (`Response`) desde un enfoque de **aprendizaje supervisado**, ajustando un modelo de **árbol de decisión**.
+
+El objetivo no es únicamente predecir, sino sobre todo **interpretar**:
+
+-   si `Education` aparece como variable relevante,
+-   en qué condiciones (por ejemplo, combinada con ingresos o recency),
+-   y qué perfiles concretos presentan mayor probabilidad de respuesta.
+
+Los árboles de decisión permiten capturar relaciones no lineales e interacciones entre variables, además de proporcionar una representación fácilmente interpretable desde una perspectiva de negocio.
+
+Este enfoque permite responder a: *“¿Es la educación un factor realmente determinante cuando consideramos otros atributos del cliente?”*.
+
+#### 2.2.3. Enfoque de descubrimiento: campañas específicas asociadas a niveles educativos (reglas de asociación)
+
+Como tercer enfoque, analizaremos si existen **patrones concretos de aceptación** entre determinadas campañas y niveles educativos mediante técnicas de **reglas de asociación**.
+
+En este caso, trataremos cada posible “evento” como un ítem (por ejemplo, *Education = Master, AcceptedCmp3 = 1, Response = 1*) y buscaremos reglas del tipo:
+
+-   `{Education = X} → {AcceptedCmpK = 1}`
+-   `{Education = X} → {Response = 1}`
+-   `{Education = X, AcceptedCmpK = 1} → {Response = 1}`
+
+Evaluaremos la relevancia de las reglas mediante medidas estándar:
+
+-   **support**: frecuencia del patrón
+-   **confidence**: probabilidad condicional
+-   **lift**: fuerza de asociación respecto a independencia
+
+Este enfoque es especialmente útil para detectar si existe afinidad entre campañas específicas y perfiles educativos concretos, lo que tiene una interpretación directa en términos de segmentación y diseño de campañas.
+
+#### 2.2.4. Enfoque no supervisado: segmentación de comportamiento ante campañas (clustering)
+
+Finalmente, aplicaremos técnicas de clustering para explorar si existen segmentos diferenciados de clientes según su comportamiento ante campañas y promociones.
+
+La idea principal es identificar perfiles del tipo:
+
+-   clientes altamente receptivos a campañas,
+-   clientes sensibles a descuentos,
+-   clientes poco reactivos, etc.
+
+Para ello, construiremos un espacio de características basado en variables de campañas y comportamiento (por ejemplo, `Total_Campaigns_Accepted`, `Response`, `Deals_Ratio`, `Recency`, `NumWebVisitsMonth`, etc.) y aplicaremos un algoritmo de clustering (por ejemplo, k-means).
+
+Una vez obtenidos los segmentos, se analizará la distribución del nivel educativo dentro de cada cluster, permitiendo responder a:
+
+> ¿Se concentran ciertos niveles educativos en perfiles concretos de respuesta?
+
+Este enfoque aporta una perspectiva diferente: en vez de analizar solo relaciones directas, permite evaluar si la educación “estructura” perfiles globales de comportamiento.
+
+En conjunto, este planteamiento metodológico permite abordar la pregunta de investigación desde distintos niveles:
+
+-   diferencias globales (inferencia),
+-   explicación multivariante (supervisado),
+-   patrones específicos (reglas),
+-   y segmentación de perfiles (no supervisado).
+
+Esto refuerza la robustez de las conclusiones y permite traducir los resultados en implicaciones prácticas de negocio.
+
+## 3. Importación de librerías y carga de los datos
+
+En esta sección se importan las librerías necesarias para el análisis y se carga el dataset que será utilizado en el estudio. Es importante señalar que los datos empleados en este notebook **ya han sido previamente limpiados y procesados** en el notebook de preprocesamiento. Por tanto, en este análisis partimos de un dataset preparado y listo para aplicar técnicas estadísticas y de ciencia de datos.
+
+Dado el enfoque metodológico planteado, utilizaremos librerías de manipulación de datos, visualización, modelización y minería de patrones.
+
+```{r}
+library(tidyr)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+# estadística inferencial y comparaciones post-hoc
+library(rstatix)
+library(FSA)
+library(effectsize)
+# árbol de decisión (modelo supervisado)
+library(rpart)
+library(rpart.plot)
+# reglas de asociación
+library(arules)
+library(arulesViz)
+# clustering y evaluación
+library(cluster)
+library(factoextra)
+```
+
+A continuación, se carga el dataset previamente procesado.
+
+```{r}
+data <- read_csv("./data/marketing_campaign_processed.csv")
+head(data)
+```
+
+```{r}
+summary(data)
+```
+
+Construimos el factor ordenado sobre la variable `Education`:
+
+```{r}
+data$Education <- factor(
+  data$Education, 
+  levels = c("Basic", "2n Cycle", "Graduation", "Master", "PhD"), 
+  ordered = TRUE
+)
+
+levels(data$Education)
+is.ordered(data$Education)
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+## X. Bibliografía {#bibliografía}
+
+[1] Salesforce. What is Market Segmentation? A Guide. <https://www.salesforce.com/eu/marketing/segmentation/>
+
+[2] Salesforce. What Is an Ideal Customer Profile (ICP)? <https://www.salesforce.com/blog/ideal-customer-profile/>
+
+[3] McKinsey & Company. The attention equation: Winning the right battles for consumer attention. <https://www.mckinsey.com/industries/technology-media-and-telecommunications/our-insights/the-attention-equation-winning-the-right-battles-for-consumer-attention>
