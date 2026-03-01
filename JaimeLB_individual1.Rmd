@@ -23,6 +23,12 @@ Responder a esta cuestión resulta especialmente relevante desde una perspectiva
 
 En este análisis utilizamos la variable `Complain`, que indica si el cliente presentó alguna queja en los últimos dos años, junto con las variables que recogen el número de compras realizadas en cada canal: web, catálogo y tienda física. A partir de esta información, evaluaremos si el comportamiento de compra por canal está asociado con la probabilidad de que el cliente haya presentado una queja.
 
+Además, esta pregunta se enmarca en un ámbito central de la analítica de clientes: la **gestión de la experiencia del cliente (Customer Experience, CX)** en entornos **multicanal u omnicanal**. En la actualidad, las organizaciones buscan ofrecer una **experiencia coherente y consistente a través de todos los puntos de contacto**, ya que la percepción global del cliente no depende de un único canal, sino del conjunto de interacciones mantenidas con la empresa [[1, 4]](#bibliografía).
+
+Diversos estudios y consultoras estratégicas destacan que la experiencia de cliente se ha convertido en un factor clave de diferenciación competitiva, influyendo directamente en la fidelización, la reputación de marca y el valor de vida del cliente [[2]](#bibliografía). En este contexto, analizar si **algún canal de compra está asociado con una mayor probabilidad de queja** constituye una forma directa de detectar posibles fricciones específicas (problemas logísticos, atención postventa, experiencia digital, etc.) y orientar decisiones basadas en evidencia cuantitativa.
+
+Asimismo, el enfoque omnicanal implica que los clientes interactúan simultáneamente con varios canales a lo largo de su proceso de compra, lo que refuerza la necesidad de evaluar si la experiencia es homogénea o si existen diferencias sistemáticas entre ellos [[3]](#bibliografía). Desde esta perspectiva, el presente análisis se sitúa en la intersección entre **analítica de comportamiento, medición de experiencia y toma de decisiones estratégicas basada en datos**.
+
 ### 1.1. Objetivos
 
 El estudio persigue los siguientes objetivos:
@@ -95,6 +101,7 @@ library(tidyr)
 library(readr)
 library(dplyr)
 library(ggplot2)
+library(plotly)
 ```
 
 A continuación, se carga el dataset previamente procesado.
@@ -504,16 +511,21 @@ tabla_plot$Complain <- factor(tabla_plot$Complain,
                               levels = c("0", "1"),
                               labels = c("No queja", "Queja"))
 
-ggplot(tabla_plot, aes(x = Primary_Channel,
-                       y = proportion,
-                       fill = Complain)) +
+p_prop <- ggplot(tabla_plot, aes(x = Primary_Channel,
+                                y = proportion,
+                                fill = Complain,
+                                text = paste0(
+                                  "Canal: ", Primary_Channel,
+                                  "<br>Grupo: ", Complain,
+                                  "<br>Proporción: ", scales::percent(proportion, accuracy = 0.1)
+                                ))) +
   geom_col(position = "fill", width = 0.7) +
   scale_fill_manual(values = c("No queja" = "#1f77b4",
                                "Queja" = "#d62728")) +
   scale_y_continuous(labels = scales::percent_format()) +
   labs(
     title = "Proporción de quejas según canal principal",
-    subtitle = "Distribución porcentual dentro de cada canal",
+    subtitle = "Distribución porcentual dentro de cada canal (interactivo)",
     x = "Canal principal",
     y = "Porcentaje dentro del canal",
     fill = "Tipo de cliente"
@@ -523,6 +535,8 @@ ggplot(tabla_plot, aes(x = Primary_Channel,
     plot.title = element_text(face = "bold", hjust = 0.5),
     plot.subtitle = element_text(hjust = 0.5)
   )
+
+ggplotly(p_prop, tooltip = "text")
 ```
 
 El análisis descriptivo de la tabla de contingencia y del gráfico de proporciones muestra que la tasa de queja es baja en todos los canales principales, situándose en valores inferiores al 1.2% en todos los casos. Aunque el canal Web presenta la proporción ligeramente más alta (1.19%) y el grupo Mixed la más baja (0.81%), las diferencias observadas son reducidas en términos absolutos y no parecen reflejar un patrón estructural claro.
@@ -693,3 +707,13 @@ Finalmente, debe reconocerse como limitación metodológica la **baja frecuencia
 En consecuencia, la evidencia obtenida permite responder a la pregunta de investigación de forma clara:
 
 > El canal de compra no parece constituir un factor determinante en la aparición de quejas en esta base de clientes.
+
+## 9. Bibliografía {#bibliografía}
+
+[1] Salesforce. What is Customer Experience (CX)? <https://www.salesforce.com/cx/what-is-customer-experience/>
+
+[2] Bain & Company. Customer Experience Analytics. <https://www.bain.com/consulting-services/customer-strategy-and-marketing/customer-experience-transformation/customer-episode-design/customer-experience-analytics/>
+
+[3] McKinsey & Company. Omnichannel customer experience: Winning in retail. <https://www.mckinsey.com/capabilities/growth-marketing-and-sales/solutions/periscope/solutions/marketing-solutions/customer-insights>
+
+[4] Qualtrics. What is Customer Experience Management? <https://www.qualtrics.com/experience-management/customer/>
