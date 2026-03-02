@@ -40,7 +40,7 @@ El estudio persigue los siguientes objetivos:
 
 De este modo, el análisis no solo permitirá determinar si existe relación, sino también comprender su magnitud y relevancia práctica desde una perspectiva de negocio.
 
-## 2. Definición metodológica y planteamiento estadístico
+## 2. Definición metodológica y planteamiento analítico
 
 ### 2.1. Naturaleza de las variables
 
@@ -63,9 +63,9 @@ La pregunta de investigación puede reformularse estadísticamente de la siguien
 
 > ¿Son independientes el comportamiento de compra por canal y la probabilidad de que un cliente presente una queja?
 
-Para responderla, se adoptarán dos enfoques complementarios:
+Para responderla, se adoptarán dos enfoques complementarios.
 
-#### Enfoque de asociación entre variables categóricas
+#### [Enfoque de asociación entre variables categóricas]{.underline}
 
 Se definirá una variable categórica que represente el **canal principal de compra** del cliente. A partir de ella, se construirá una tabla de contingencia entre:
 
@@ -79,7 +79,7 @@ Sobre dicha tabla se aplicará el **contraste χ² de independencia**, cuyas hip
 
 El contraste se evaluará al nivel de significación habitual del 5%. Además, se calculará el **tamaño del efecto mediante el estadístico de Cramér (Cramér’s V)**, con el fin de cuantificar la intensidad de la asociación, ya que la significación estadística no implica necesariamente relevancia práctica.
 
-#### Enfoque de modelización probabilística
+#### [Enfoque de modelización probabilística]{.underline}
 
 Como complemento al análisis anterior, se empleará un modelo de **regresión logística binaria**, donde:
 
