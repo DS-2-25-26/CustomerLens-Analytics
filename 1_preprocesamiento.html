@@ -1912,8 +1912,155 @@ predictivos.</li>
 <p>Procedemos a eliminarlas:</p>
 <pre class="r"><code>data &lt;- data %&gt;% select(-Z_CostContact, -Z_Revenue)</code></pre>
 </div>
+<div id="comprobación-de-coherencia-interna-entre-compras-gasto-y-campañas" class="section level3">
+<h3>2.6. Comprobación de coherencia interna entre compras, gasto y
+campañas</h3>
+<p>En un dataset de comportamiento de cliente es habitual encontrar
+pequeñas incoherencias entre variables de distinta naturaleza: por
+ejemplo, clientes con 0 compras por canal pero con gasto positivo en
+alguna categoría, o clientes con compras registradas pero con gasto
+total 0. Esto puede ocurrir por diversas razones (compras en categorías
+no recogidas en <code>Mnt*</code>, devoluciones, desfases temporales o
+errores de registro).</p>
+<p>Por ello, realizamos una <strong>auditoría de coherencia
+interna</strong> entre las variables de compras por canal, gasto en
+productos y aceptación de campañas.</p>
+<p>En esta fase se cuantifican las posibles incoherencias detectadas y,
+cuando representan una contradicción directa entre variables, se
+eliminan las observaciones afectadas para garantizar la consistencia del
+dataset.</p>
+<div id="compras-por-canal-vs-gasto-total" class="section level4">
+<h4>2.6.1. Compras por canal vs gasto total</h4>
+<p>En primer lugar, construimos métricas auxiliares (sin modificar aún
+el dataset original) para evaluar coherencia entre compras y gasto.</p>
+<pre class="r"><code>audit &lt;- data %&gt;%
+  mutate(
+    Purchases_Channels = NumWebPurchases + NumCatalogPurchases + NumStorePurchases,
+    Spending_Products  = MntWines + MntFruits + MntMeatProducts +
+                         MntFishProducts + MntSweetProducts + MntGoldProds,
+    Campaign_Any = ifelse(
+      (AcceptedCmp1 + AcceptedCmp2 + AcceptedCmp3 +
+       AcceptedCmp4 + AcceptedCmp5 + Response) &gt; 0,
+      1, 0
+    )
+  )</code></pre>
+<p>Analizamos ahora dos posibles situaciones inconsistentes:</p>
+<ul>
+<li>Clientes con <strong>0 compras por canal</strong> pero <strong>gasto
+positivo</strong>.</li>
+<li>Clientes con <strong>compras registradas</strong> pero <strong>gasto
+total 0</strong>.</li>
+</ul>
+<pre class="r"><code># 0 compras por canal pero gasto positivo
+n_purch0_spendpos &lt;- audit %&gt;%
+  filter(Purchases_Channels == 0, Spending_Products &gt; 0) %&gt;%
+  nrow()
+
+# compras por canal pero gasto total 0
+n_purchpos_spend0 &lt;- audit %&gt;%
+  filter(Purchases_Channels &gt; 0, Spending_Products == 0) %&gt;%
+  nrow()
+
+n_purch0_spendpos</code></pre>
+<pre><code>## [1] 6</code></pre>
+<pre class="r"><code>n_purchpos_spend0</code></pre>
+<pre><code>## [1] 0</code></pre>
+<p>Se detectan <strong>6 clientes</strong> con gasto positivo pero 0
+compras registradas por canal. No se detecta ningún cliente con compras
+registradas y gasto total 0.</p>
+<p>La primera situación representa una incoherencia directa: el gasto
+monetario debería derivarse de compras realizadas por alguno de los
+canales registrados en el dataset.</p>
+</div>
+<div id="compras-por-canal-vs-aceptación-de-campañas" class="section level4">
+<h4>2.6.2. Compras por canal vs aceptación de campañas</h4>
+<p>A continuación, analizamos si existen clientes que han aceptado
+alguna campaña (AcceptedCmp1..5 o Response) pero no presentan compras
+registradas por canal.</p>
+<pre class="r"><code>n_purch0_campaign &lt;- audit %&gt;%
+  filter(Purchases_Channels == 0, Campaign_Any == 1) %&gt;%
+  nrow()
+
+n_purch0_campaign</code></pre>
+<pre><code>## [1] 0</code></pre>
+<p>No se detectan clientes que hayan aceptado campañas sin registrar
+compras por canal. Esto aporta consistencia adicional al dataset, ya que
+la aceptación de campañas aparece asociada a actividad de compra.</p>
+</div>
+<div id="creación-de-indicadores-de-posible-incoherencia-flags" class="section level4">
+<h4>2.6.3. Creación de indicadores de posible incoherencia (flags)</h4>
+<p>Para formalizar la detección de inconsistencias, generamos
+indicadores binarios en el objeto auxiliar <code>audit</code>.</p>
+<pre class="r"><code>audit &lt;- audit %&gt;%
+  mutate(
+    Flag_Purch0_SpendPos = ifelse(Purchases_Channels == 0 &amp; Spending_Products &gt; 0, 1, 0),
+    Flag_PurchPos_Spend0 = ifelse(Purchases_Channels &gt; 0 &amp; Spending_Products == 0, 1, 0),
+    Flag_Purch0_Campaign = ifelse(Purchases_Channels == 0 &amp; Campaign_Any == 1, 1, 0)
+  )
+
+audit %&gt;%
+  summarise(
+    Purch0_SpendPos = sum(Flag_Purch0_SpendPos),
+    PurchPos_Spend0 = sum(Flag_PurchPos_Spend0),
+    Purch0_Campaign = sum(Flag_Purch0_Campaign)
+  )</code></pre>
+<pre><code>## # A tibble: 1 × 3
+##   Purch0_SpendPos PurchPos_Spend0 Purch0_Campaign
+##             &lt;dbl&gt;           &lt;dbl&gt;           &lt;dbl&gt;
+## 1               6               0               0</code></pre>
+<p>Los indicadores confirman que:</p>
+<ul>
+<li>Existen 6 casos del tipo gasto positivo sin compras por canal.</li>
+<li>No existen casos del tipo compras sin gasto.</li>
+<li>No existen casos del tipo campañas aceptadas sin compras.</li>
+</ul>
+<p>Por tanto, la única incoherencia real detectada corresponde al primer
+caso.</p>
+</div>
+<div id="depuración-eliminación-de-observaciones-inconsistentes" class="section level4">
+<h4>2.6.4. Depuración: eliminación de observaciones inconsistentes</h4>
+<p>Dado que el gasto monetario debería derivarse de compras registradas
+por canal, consideramos que las 6 observaciones detectadas representan
+inconsistencias estructurales del dataset.</p>
+<p>Por ello, procedemos a eliminarlas del conjunto de datos.</p>
+<pre class="r"><code>n_before &lt;- nrow(data)
+
+data &lt;- data %&gt;%
+  filter(!( (NumWebPurchases + NumCatalogPurchases + NumStorePurchases) == 0 &amp;
+              (MntWines + MntFruits + MntMeatProducts +
+               MntFishProducts + MntSweetProducts + MntGoldProds) &gt; 0 ))
+
+n_after &lt;- nrow(data)
+n_removed &lt;- n_before - n_after
+n_before</code></pre>
+<pre><code>## [1] 2212</code></pre>
+<pre class="r"><code>n_after</code></pre>
+<pre><code>## [1] 2206</code></pre>
+<pre class="r"><code>n_removed</code></pre>
+<pre><code>## [1] 6</code></pre>
+<p>Tras la depuración, se eliminan 6 observaciones inconsistentes,
+garantizando que:</p>
+<ul>
+<li>Todo gasto registrado proviene de al menos una compra por
+canal.</li>
+<li>Se mantiene la coherencia interna entre variables monetarias y de
+actividad.</li>
+</ul>
+<p>Adicionalmente, verificamos que ya no existen incoherencias de este
+tipo:</p>
+<pre class="r"><code>audit_check &lt;- data %&gt;%
+  mutate(
+    Purchases_Channels = NumWebPurchases + NumCatalogPurchases + NumStorePurchases,
+    Spending_Products  = MntWines + MntFruits + MntMeatProducts +
+                         MntFishProducts + MntSweetProducts + MntGoldProds
+  )
+
+sum(audit_check$Purchases_Channels == 0 &amp; audit_check$Spending_Products &gt; 0)</code></pre>
+<pre><code>## [1] 0</code></pre>
+</div>
+</div>
 <div id="resumen-tras-la-limpieza-y-tratamiento-inicial" class="section level3">
-<h3>2.6. Resumen tras la limpieza y tratamiento inicial</h3>
+<h3>2.7. Resumen tras la limpieza y tratamiento inicial</h3>
 <p>Tras la auditoría y el tratamiento inicial del dataset, se han
 realizado las siguientes acciones:</p>
 <ul>
@@ -1940,6 +2087,11 @@ permitiendo futuros análisis temporales.</li>
 <li>Se han identificado y eliminado las variables constantes
 <code>Z_CostContact</code> y <code>Z_Revenue</code>, al no aportar
 información discriminativa.</li>
+<li>Se ha realizado una comprobación de coherencia interna entre compras
+por canal y gasto en productos, eliminando 6 observaciones con gasto
+positivo (<code>Mnt* &gt; 0</code>) pero 0 compras registradas en los
+canales
+(<code>NumWebPurchases + NumCatalogPurchases + NumStorePurchases = 0</code>).</li>
 </ul>
 <p>Tras estos pasos, el dataset queda depurado, consistente y preparado
 para la creación de variables derivadas.</p>
@@ -2154,16 +2306,16 @@ preguntas planteadas.</p>
                    &quot;Responded_Any_Campaign&quot;, &quot;Tenure_Days&quot;)
 
 data %&gt;% select(all_of(derived_vars)) %&gt;% str()</code></pre>
-<pre><code>## tibble [2,209 × 9] (S3: tbl_df/tbl/data.frame)
-##  $ Age                     : num [1:2209] 57 60 49 30 33 47 43 29 40 64 ...
-##  $ Children_Home           : num [1:2209] 0 2 0 1 1 1 1 1 1 2 ...
-##  $ Has_Children            : num [1:2209] 0 1 0 1 1 1 1 1 1 1 ...
-##  $ Total_Spending          : num [1:2209] 1617 27 776 53 422 ...
-##  $ Total_Purchases         : num [1:2209] 22 4 20 6 14 20 17 8 5 1 ...
-##  $ Deals_Ratio             : num [1:2209] 0.136 0.5 0.05 0.333 0.357 ...
-##  $ Total_Campaigns_Accepted: num [1:2209] 0 0 0 0 0 0 0 0 0 1 ...
-##  $ Responded_Any_Campaign  : num [1:2209] 1 0 0 0 0 0 0 0 1 1 ...
-##  $ Tenure_Days             : num [1:2209] 848 298 497 324 346 478 778 602 573 293 ...</code></pre>
+<pre><code>## tibble [2,203 × 9] (S3: tbl_df/tbl/data.frame)
+##  $ Age                     : num [1:2203] 57 60 49 30 33 47 43 29 40 64 ...
+##  $ Children_Home           : num [1:2203] 0 2 0 1 1 1 1 1 1 2 ...
+##  $ Has_Children            : num [1:2203] 0 1 0 1 1 1 1 1 1 1 ...
+##  $ Total_Spending          : num [1:2203] 1617 27 776 53 422 ...
+##  $ Total_Purchases         : num [1:2203] 22 4 20 6 14 20 17 8 5 1 ...
+##  $ Deals_Ratio             : num [1:2203] 0.136 0.5 0.05 0.333 0.357 ...
+##  $ Total_Campaigns_Accepted: num [1:2203] 0 0 0 0 0 0 0 0 0 1 ...
+##  $ Responded_Any_Campaign  : num [1:2203] 1 0 0 0 0 0 0 0 1 1 ...
+##  $ Tenure_Days             : num [1:2203] 848 298 497 324 346 478 778 602 573 293 ...</code></pre>
 </div>
 </div>
 <div id="dataset-final" class="section level2">
@@ -2181,47 +2333,47 @@ posteriores.</li>
 <div id="dimensiones-y-estructura-del-dataset-final" class="section level3">
 <h3>4.1. Dimensiones y estructura del dataset final</h3>
 <pre class="r"><code>dim(data)</code></pre>
-<pre><code>## [1] 2209   36</code></pre>
+<pre><code>## [1] 2203   36</code></pre>
 <pre class="r"><code>str(data)</code></pre>
-<pre><code>## tibble [2,209 × 36] (S3: tbl_df/tbl/data.frame)
-##  $ ID                      : num [1:2209] 5524 2174 4141 6182 5324 ...
-##  $ Year_Birth              : num [1:2209] 1957 1954 1965 1984 1981 ...
+<pre><code>## tibble [2,203 × 36] (S3: tbl_df/tbl/data.frame)
+##  $ ID                      : num [1:2203] 5524 2174 4141 6182 5324 ...
+##  $ Year_Birth              : num [1:2203] 1957 1954 1965 1984 1981 ...
 ##  $ Education               : Ord.factor w/ 5 levels &quot;Basic&quot;&lt;&quot;2n Cycle&quot;&lt;..: 3 3 3 3 5 4 3 5 5 5 ...
 ##  $ Marital_Status          : Factor w/ 5 levels &quot;Single&quot;,&quot;Together&quot;,..: 1 1 2 2 3 2 4 3 2 2 ...
-##  $ Income                  : num [1:2209] 58138 46344 71613 26646 58293 ...
-##  $ Kidhome                 : num [1:2209] 0 1 0 1 1 0 0 1 1 1 ...
-##  $ Teenhome                : num [1:2209] 0 1 0 0 0 1 1 0 0 1 ...
-##  $ Dt_Customer             : Date[1:2209], format: &quot;2012-09-04&quot; &quot;2014-03-08&quot; ...
-##  $ Recency                 : num [1:2209] 58 38 26 26 94 16 34 32 19 68 ...
-##  $ MntWines                : num [1:2209] 635 11 426 11 173 520 235 76 14 28 ...
-##  $ MntFruits               : num [1:2209] 88 1 49 4 43 42 65 10 0 0 ...
-##  $ MntMeatProducts         : num [1:2209] 546 6 127 20 118 98 164 56 24 6 ...
-##  $ MntFishProducts         : num [1:2209] 172 2 111 10 46 0 50 3 3 1 ...
-##  $ MntSweetProducts        : num [1:2209] 88 1 21 3 27 42 49 1 3 1 ...
-##  $ MntGoldProds            : num [1:2209] 88 6 42 5 15 14 27 23 2 13 ...
-##  $ NumDealsPurchases       : num [1:2209] 3 2 1 2 5 2 4 2 1 1 ...
-##  $ NumWebPurchases         : num [1:2209] 8 1 8 2 5 6 7 4 3 1 ...
-##  $ NumCatalogPurchases     : num [1:2209] 10 1 2 0 3 4 3 0 0 0 ...
-##  $ NumStorePurchases       : num [1:2209] 4 2 10 4 6 10 7 4 2 0 ...
-##  $ NumWebVisitsMonth       : num [1:2209] 7 5 4 6 5 6 6 8 9 20 ...
-##  $ AcceptedCmp3            : num [1:2209] 0 0 0 0 0 0 0 0 0 1 ...
-##  $ AcceptedCmp4            : num [1:2209] 0 0 0 0 0 0 0 0 0 0 ...
-##  $ AcceptedCmp5            : num [1:2209] 0 0 0 0 0 0 0 0 0 0 ...
-##  $ AcceptedCmp1            : num [1:2209] 0 0 0 0 0 0 0 0 0 0 ...
-##  $ AcceptedCmp2            : num [1:2209] 0 0 0 0 0 0 0 0 0 0 ...
-##  $ Complain                : num [1:2209] 0 0 0 0 0 0 0 0 0 0 ...
-##  $ Response                : num [1:2209] 1 0 0 0 0 0 0 0 1 0 ...
-##  $ Age                     : num [1:2209] 57 60 49 30 33 47 43 29 40 64 ...
-##  $ Children_Home           : num [1:2209] 0 2 0 1 1 1 1 1 1 2 ...
-##  $ Has_Children            : num [1:2209] 0 1 0 1 1 1 1 1 1 1 ...
-##  $ Total_Spending          : num [1:2209] 1617 27 776 53 422 ...
-##  $ Total_Purchases         : num [1:2209] 22 4 20 6 14 20 17 8 5 1 ...
-##  $ Deals_Ratio             : num [1:2209] 0.136 0.5 0.05 0.333 0.357 ...
-##  $ Total_Campaigns_Accepted: num [1:2209] 0 0 0 0 0 0 0 0 0 1 ...
-##  $ Responded_Any_Campaign  : num [1:2209] 1 0 0 0 0 0 0 0 1 1 ...
-##  $ Tenure_Days             : num [1:2209] 848 298 497 324 346 478 778 602 573 293 ...</code></pre>
+##  $ Income                  : num [1:2203] 58138 46344 71613 26646 58293 ...
+##  $ Kidhome                 : num [1:2203] 0 1 0 1 1 0 0 1 1 1 ...
+##  $ Teenhome                : num [1:2203] 0 1 0 0 0 1 1 0 0 1 ...
+##  $ Dt_Customer             : Date[1:2203], format: &quot;2012-09-04&quot; &quot;2014-03-08&quot; ...
+##  $ Recency                 : num [1:2203] 58 38 26 26 94 16 34 32 19 68 ...
+##  $ MntWines                : num [1:2203] 635 11 426 11 173 520 235 76 14 28 ...
+##  $ MntFruits               : num [1:2203] 88 1 49 4 43 42 65 10 0 0 ...
+##  $ MntMeatProducts         : num [1:2203] 546 6 127 20 118 98 164 56 24 6 ...
+##  $ MntFishProducts         : num [1:2203] 172 2 111 10 46 0 50 3 3 1 ...
+##  $ MntSweetProducts        : num [1:2203] 88 1 21 3 27 42 49 1 3 1 ...
+##  $ MntGoldProds            : num [1:2203] 88 6 42 5 15 14 27 23 2 13 ...
+##  $ NumDealsPurchases       : num [1:2203] 3 2 1 2 5 2 4 2 1 1 ...
+##  $ NumWebPurchases         : num [1:2203] 8 1 8 2 5 6 7 4 3 1 ...
+##  $ NumCatalogPurchases     : num [1:2203] 10 1 2 0 3 4 3 0 0 0 ...
+##  $ NumStorePurchases       : num [1:2203] 4 2 10 4 6 10 7 4 2 0 ...
+##  $ NumWebVisitsMonth       : num [1:2203] 7 5 4 6 5 6 6 8 9 20 ...
+##  $ AcceptedCmp3            : num [1:2203] 0 0 0 0 0 0 0 0 0 1 ...
+##  $ AcceptedCmp4            : num [1:2203] 0 0 0 0 0 0 0 0 0 0 ...
+##  $ AcceptedCmp5            : num [1:2203] 0 0 0 0 0 0 0 0 0 0 ...
+##  $ AcceptedCmp1            : num [1:2203] 0 0 0 0 0 0 0 0 0 0 ...
+##  $ AcceptedCmp2            : num [1:2203] 0 0 0 0 0 0 0 0 0 0 ...
+##  $ Complain                : num [1:2203] 0 0 0 0 0 0 0 0 0 0 ...
+##  $ Response                : num [1:2203] 1 0 0 0 0 0 0 0 1 0 ...
+##  $ Age                     : num [1:2203] 57 60 49 30 33 47 43 29 40 64 ...
+##  $ Children_Home           : num [1:2203] 0 2 0 1 1 1 1 1 1 2 ...
+##  $ Has_Children            : num [1:2203] 0 1 0 1 1 1 1 1 1 1 ...
+##  $ Total_Spending          : num [1:2203] 1617 27 776 53 422 ...
+##  $ Total_Purchases         : num [1:2203] 22 4 20 6 14 20 17 8 5 1 ...
+##  $ Deals_Ratio             : num [1:2203] 0.136 0.5 0.05 0.333 0.357 ...
+##  $ Total_Campaigns_Accepted: num [1:2203] 0 0 0 0 0 0 0 0 0 1 ...
+##  $ Responded_Any_Campaign  : num [1:2203] 1 0 0 0 0 0 0 0 1 1 ...
+##  $ Tenure_Days             : num [1:2203] 848 298 497 324 346 478 778 602 573 293 ...</code></pre>
 <p>Tras eliminar observaciones y añadir y eliminar variables nos hemos
-quedado con un total de <strong>2209 observaciones</strong> y <strong>36
+quedado con un total de <strong>2203 observaciones</strong> y <strong>36
 variables</strong>.</p>
 </div>
 <div id="variables-del-dataset-final" class="section level3">
@@ -2326,7 +2478,7 @@ write_csv(data, output_path)</code></pre>
 <pre class="r"><code>clean_size_bytes &lt;- file.info(output_path)$size
 clean_size_mb &lt;- clean_size_bytes / (1024^2)
 clean_size_mb</code></pre>
-<pre><code>## [1] 0.2691412</code></pre>
+<pre><code>## [1] 0.2685175</code></pre>
 <p>Como podemos ver el archivo ocupa aproximadamente <strong>0.27
 MB</strong>.</p>
 <p>Con este notebook se garantiza que el proceso de preparación de los

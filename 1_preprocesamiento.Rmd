@@ -256,7 +256,138 @@ Procedemos a eliminarlas:
 data <- data %>% select(-Z_CostContact, -Z_Revenue)
 ```
 
-### 2.6. Resumen tras la limpieza y tratamiento inicial
+### 2.6. Comprobación de coherencia interna entre compras, gasto y campañas
+
+En un dataset de comportamiento de cliente es habitual encontrar pequeñas incoherencias entre variables de distinta naturaleza: por ejemplo, clientes con 0 compras por canal pero con gasto positivo en alguna categoría, o clientes con compras registradas pero con gasto total 0. Esto puede ocurrir por diversas razones (compras en categorías no recogidas en `Mnt*`, devoluciones, desfases temporales o errores de registro).
+
+Por ello, realizamos una **auditoría de coherencia interna** entre las variables de compras por canal, gasto en productos y aceptación de campañas.
+
+En esta fase se cuantifican las posibles incoherencias detectadas y, cuando representan una contradicción directa entre variables, se eliminan las observaciones afectadas para garantizar la consistencia del dataset.
+
+#### 2.6.1. Compras por canal vs gasto total
+
+En primer lugar, construimos métricas auxiliares (sin modificar aún el dataset original) para evaluar coherencia entre compras y gasto.
+
+```{r}
+audit <- data %>%
+  mutate(
+    Purchases_Channels = NumWebPurchases + NumCatalogPurchases + NumStorePurchases,
+    Spending_Products  = MntWines + MntFruits + MntMeatProducts +
+                         MntFishProducts + MntSweetProducts + MntGoldProds,
+    Campaign_Any = ifelse(
+      (AcceptedCmp1 + AcceptedCmp2 + AcceptedCmp3 +
+       AcceptedCmp4 + AcceptedCmp5 + Response) > 0,
+      1, 0
+    )
+  )
+```
+
+Analizamos ahora dos posibles situaciones inconsistentes:
+
+-   Clientes con **0 compras por canal** pero **gasto positivo**.
+-   Clientes con **compras registradas** pero **gasto total 0**.
+
+```{r}
+# 0 compras por canal pero gasto positivo
+n_purch0_spendpos <- audit %>%
+  filter(Purchases_Channels == 0, Spending_Products > 0) %>%
+  nrow()
+
+# compras por canal pero gasto total 0
+n_purchpos_spend0 <- audit %>%
+  filter(Purchases_Channels > 0, Spending_Products == 0) %>%
+  nrow()
+
+n_purch0_spendpos
+n_purchpos_spend0
+```
+
+Se detectan **6 clientes** con gasto positivo pero 0 compras registradas por canal. No se detecta ningún cliente con compras registradas y gasto total 0.
+
+La primera situación representa una incoherencia directa: el gasto monetario debería derivarse de compras realizadas por alguno de los canales registrados en el dataset.
+
+#### 2.6.2. Compras por canal vs aceptación de campañas
+
+A continuación, analizamos si existen clientes que han aceptado alguna campaña (AcceptedCmp1..5 o Response) pero no presentan compras registradas por canal.
+
+```{r}
+n_purch0_campaign <- audit %>%
+  filter(Purchases_Channels == 0, Campaign_Any == 1) %>%
+  nrow()
+
+n_purch0_campaign
+```
+
+No se detectan clientes que hayan aceptado campañas sin registrar compras por canal. Esto aporta consistencia adicional al dataset, ya que la aceptación de campañas aparece asociada a actividad de compra.
+
+#### 2.6.3. Creación de indicadores de posible incoherencia (flags)
+
+Para formalizar la detección de inconsistencias, generamos indicadores binarios en el objeto auxiliar `audit`.
+
+```{r}
+audit <- audit %>%
+  mutate(
+    Flag_Purch0_SpendPos = ifelse(Purchases_Channels == 0 & Spending_Products > 0, 1, 0),
+    Flag_PurchPos_Spend0 = ifelse(Purchases_Channels > 0 & Spending_Products == 0, 1, 0),
+    Flag_Purch0_Campaign = ifelse(Purchases_Channels == 0 & Campaign_Any == 1, 1, 0)
+  )
+
+audit %>%
+  summarise(
+    Purch0_SpendPos = sum(Flag_Purch0_SpendPos),
+    PurchPos_Spend0 = sum(Flag_PurchPos_Spend0),
+    Purch0_Campaign = sum(Flag_Purch0_Campaign)
+  )
+```
+
+Los indicadores confirman que:
+
+-   Existen 6 casos del tipo gasto positivo sin compras por canal.
+-   No existen casos del tipo compras sin gasto.
+-   No existen casos del tipo campañas aceptadas sin compras.
+
+Por tanto, la única incoherencia real detectada corresponde al primer caso.
+
+#### 2.6.4. Depuración: eliminación de observaciones inconsistentes
+
+Dado que el gasto monetario debería derivarse de compras registradas por canal, consideramos que las 6 observaciones detectadas representan inconsistencias estructurales del dataset.
+
+Por ello, procedemos a eliminarlas del conjunto de datos.
+
+```{r}
+n_before <- nrow(data)
+
+data <- data %>%
+  filter(!( (NumWebPurchases + NumCatalogPurchases + NumStorePurchases) == 0 &
+              (MntWines + MntFruits + MntMeatProducts +
+               MntFishProducts + MntSweetProducts + MntGoldProds) > 0 ))
+
+n_after <- nrow(data)
+n_removed <- n_before - n_after
+n_before
+n_after
+n_removed
+```
+
+Tras la depuración, se eliminan 6 observaciones inconsistentes, garantizando que:
+
+-   Todo gasto registrado proviene de al menos una compra por canal.
+-   Se mantiene la coherencia interna entre variables monetarias y de actividad.
+
+Adicionalmente, verificamos que ya no existen incoherencias de este tipo:
+
+```{r}
+audit_check <- data %>%
+  mutate(
+    Purchases_Channels = NumWebPurchases + NumCatalogPurchases + NumStorePurchases,
+    Spending_Products  = MntWines + MntFruits + MntMeatProducts +
+                         MntFishProducts + MntSweetProducts + MntGoldProds
+  )
+
+sum(audit_check$Purchases_Channels == 0 & audit_check$Spending_Products > 0)
+```
+
+### 2.7. Resumen tras la limpieza y tratamiento inicial
 
 Tras la auditoría y el tratamiento inicial del dataset, se han realizado las siguientes acciones:
 
@@ -268,6 +399,7 @@ Tras la auditoría y el tratamiento inicial del dataset, se han realizado las si
 -   Se han analizado los valores faltantes y se han eliminado las observaciones con `Income` nulo, dado que representan un porcentaje reducido y esta variable es clave para el análisis.
 -   Se ha convertido `Dt_Customer` al tipo `Date`, permitiendo futuros análisis temporales.
 -   Se han identificado y eliminado las variables constantes `Z_CostContact` y `Z_Revenue`, al no aportar información discriminativa.
+-   Se ha realizado una comprobación de coherencia interna entre compras por canal y gasto en productos, eliminando 6 observaciones con gasto positivo (`Mnt* > 0`) pero 0 compras registradas en los canales (`NumWebPurchases + NumCatalogPurchases + NumStorePurchases = 0`).
 
 Tras estos pasos, el dataset queda depurado, consistente y preparado para la creación de variables derivadas.
 
@@ -468,7 +600,7 @@ dim(data)
 str(data)
 ```
 
-Tras eliminar observaciones y añadir y eliminar variables nos hemos quedado con un total de **2209 observaciones** y **36 variables**.
+Tras eliminar observaciones y añadir y eliminar variables nos hemos quedado con un total de **2203 observaciones** y **36 variables**.
 
 ### 4.2. Variables del dataset final
 
