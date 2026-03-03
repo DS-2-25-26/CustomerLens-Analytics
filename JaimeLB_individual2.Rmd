@@ -23,7 +23,7 @@ En este contexto surge la siguiente pregunta de investigación:
 
 Responder a esta cuestión resulta relevante desde una perspectiva estratégica. Si existieran diferencias sistemáticas de respuesta por nivel educativo, la empresa podría ajustar la **propuesta de valor**, el **tipo de mensaje** o incluso la **segmentación** de campañas para maximizar su efectividad. Además, el análisis puede ayudar a identificar si la educación actúa como un factor directo o si su efecto aparece principalmente dentro de patrones más complejos (por ejemplo, combinada con ingresos, edad, o comportamiento de compra).
 
-En este análisis utilizaremos la variable `Education`, definida como un factor ordenado (*Basic* \< *2n Cycle* \< *Graduation* \< *Master* \< *PhD*), y la relacionaremos con variables que recogen el comportamiento ante campañas: `Response` (aceptación de la última campaña), `Total_Campaigns_Accepted` (número total de campañas históricas aceptadas) y los indicadores individuales `AcceptedCmp1` a `AcceptedCmp5.` A partir de ellas, se evaluará si existen diferencias globales, si determinadas campañas atraen más a perfiles educativos concretos y si emergen **segmentos diferenciados** de comportamiento en los que la educación tenga un papel relevante.
+En este análisis utilizaremos la variable `Education`, definida como un factor ordenado (*Basic* \< *2n Cycle* \< *Graduation* \< *Master* \< *PhD*), y la relacionaremos con variables que recogen el comportamiento ante campañas: `Response` (aceptación de la última campaña), `Total_Campaigns_Accepted` (número total de campañas históricas aceptadas) y los indicadores individuales `AcceptedCmp1` a `AcceptedCmp5`. A partir de ellas, se evaluará si existen diferencias globales, si determinadas campañas atraen más a perfiles educativos concretos y si emergen **segmentos diferenciados** de comportamiento en los que la educación tenga un papel relevante.
 
 ### 1.1. Objetivos
 
@@ -32,7 +32,6 @@ El estudio persigue los siguientes objetivos:
 -   **Analizar descriptivamente** la respuesta a campañas en función del nivel educativo, examinando tanto la aceptación de la última campaña como la intensidad de aceptación histórica.
 -   **Evaluar formalmente** si existen diferencias estadísticamente significativas en la distribución de `Total_Campaigns_Accepted` entre niveles educativos (enfoque inferencial).
 -   **Modelizar y explicar** la respuesta a la última campaña mediante un enfoque supervisado (árbol de decisión), para determinar si `Education` aporta capacidad predictiva cuando compite con otras variables relevantes del cliente.
--   **Identificar patrones específicos** entre niveles educativos y campañas concretas mediante **reglas de asociación**, con el fin de detectar afinidades o “sesgos” de aceptación por campaña.
 -   **Explorar la existencia de perfiles (segmentos) diferenciados** de comportamiento ante campañas mediante **clustering**, y analizar la distribución del nivel educativo dentro de dichos segmentos.
 
 De este modo, el análisis no solo permitirá determinar si existe relación entre educación y respuesta, sino también comprender **cómo se manifiesta**, si se concentra en campañas concretas y si estructura perfiles de cliente con comportamiento claramente diferenciado.
@@ -87,7 +86,7 @@ La pregunta de investigación puede reformularse de manera más operativa como:
 
 > ¿Presentan los distintos niveles educativos patrones distintos de respuesta a campañas, tanto en términos de aceptación puntual, como de intensidad histórica y segmentación de comportamiento?
 
-Para responder de forma robusta, se emplearán cuatro enfoques complementarios, cada uno orientado a un aspecto específico de la pregunta.
+Para responder de forma robusta, se emplearán tres enfoques complementarios, cada uno orientado a un aspecto específico de la pregunta.
 
 #### 2.2.1. Enfoque inferencial: diferencias en intensidad de respuesta (Kruskal–Wallis)
 
@@ -118,25 +117,7 @@ Los árboles de decisión permiten capturar relaciones no lineales e interaccion
 
 Este enfoque permite responder a: *“¿Es la educación un factor realmente determinante cuando consideramos otros atributos del cliente?”*.
 
-#### 2.2.3. Enfoque de descubrimiento: campañas específicas asociadas a niveles educativos (reglas de asociación)
-
-Como tercer enfoque, analizaremos si existen **patrones concretos de aceptación** entre determinadas campañas y niveles educativos mediante técnicas de **reglas de asociación**.
-
-En este caso, trataremos cada posible “evento” como un ítem (por ejemplo, *Education = Master, AcceptedCmp3 = 1, Response = 1*) y buscaremos reglas del tipo:
-
--   `{Education = X} → {AcceptedCmpK = 1}`
--   `{Education = X} → {Response = 1}`
--   `{Education = X, AcceptedCmpK = 1} → {Response = 1}`
-
-Evaluaremos la relevancia de las reglas mediante medidas estándar:
-
--   **support**: frecuencia del patrón
--   **confidence**: probabilidad condicional
--   **lift**: fuerza de asociación respecto a independencia
-
-Este enfoque es especialmente útil para detectar si existe afinidad entre campañas específicas y perfiles educativos concretos, lo que tiene una interpretación directa en términos de segmentación y diseño de campañas.
-
-#### 2.2.4. Enfoque no supervisado: segmentación de comportamiento ante campañas (clustering)
+#### 2.2.3. Enfoque no supervisado: segmentación de comportamiento ante campañas (clustering)
 
 Finalmente, aplicaremos técnicas de clustering para explorar si existen segmentos diferenciados de clientes según su comportamiento ante campañas y promociones.
 
@@ -158,7 +139,6 @@ En conjunto, este planteamiento metodológico permite abordar la pregunta de inv
 
 -   diferencias globales (inferencia),
 -   explicación multivariante (supervisado),
--   patrones específicos (reglas),
 -   y segmentación de perfiles (no supervisado).
 
 Esto refuerza la robustez de las conclusiones y permite traducir los resultados en implicaciones prácticas de negocio.
@@ -175,6 +155,7 @@ library(readr)
 library(dplyr)
 library(ggplot2)
 library(plotly)
+library(GGally)
 # estadística inferencial y comparaciones post-hoc
 library(rstatix)
 library(FSA)
@@ -182,9 +163,6 @@ library(effectsize)
 # árbol de decisión (modelo supervisado)
 library(rpart)
 library(rpart.plot)
-# reglas de asociación
-library(arules)
-library(arulesViz)
 # clustering y evaluación
 library(cluster)
 library(factoextra)
@@ -214,167 +192,717 @@ levels(data$Education)
 is.ordered(data$Education)
 ```
 
-```{r}
+## 4. Análisis exploratorio de los datos (EDA)
 
+Antes de aplicar contrastes estadísticos o modelos de aprendizaje automático, resulta fundamental realizar un análisis exploratorio que permita comprender la distribución de las variables clave y detectar posibles patrones preliminares.
+
+Este paso es especialmente relevante porque:
+
+-   Permite contextualizar los resultados inferenciales posteriores.
+-   Ayuda a identificar posibles desequilibrios en la variable `Response`.
+-   Facilita observar diferencias iniciales entre niveles educativos.
+-   Permite anticipar la magnitud potencial de la relación antes de aplicar técnicas formales.
+
+### 4.1. Distribución del nivel educativo
+
+En primer lugar, analizamos la distribución de la variable `Education`.
+
+```{r}
+table(data$Education)
+prop.table(table(data$Education))
+```
+
+Representamos gráficamente la distribución:
+
+```{r}
+ggplot(data, aes(x = Education, fill = Education)) +
+  geom_bar(alpha = 0.85) +
+  labs(
+    title = "Distribución del nivel educativo",
+    x = "Nivel educativo",
+    y = "Número de clientes"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  )
+```
+
+La distribución del nivel educativo muestra una clara concentración en los **niveles formativos intermedios y superiores**. En particular, la categoría **Graduation** representa aproximadamente el **50.5% de la muestra (1115 clientes)**, situándose como el grupo claramente dominante. A continuación, destacan **PhD (21.6%)** y **Master (16.5%)**, mientras que los niveles **2n Cycle (9.0%)** y especialmente **Basic (2.4%)** presentan una presencia mucho más reducida.
+
+Esta estructura indica que la base de clientes analizada se caracteriza mayoritariamente por **perfiles con estudios universitarios o de posgrado**, siendo los niveles educativos más bajos claramente minoritarios. Desde el punto de vista analítico, esta asimetría debe tenerse en cuenta en los análisis posteriores, ya que las estimaciones asociadas a categorías con menor tamaño muestral (como *Basic*) pueden presentar mayor variabilidad.
+
+No obstante, todas las categorías cuentan con un número suficiente de observaciones como para permitir comparaciones razonables. En los siguientes apartados se analizará si esta estructura educativa se traduce en diferencias reales en el comportamiento de respuesta a campañas o si, por el contrario, el nivel formativo no desempeña un papel relevante en dicho comportamiento.
+
+### 4.2. Distribución de la respuesta a la última campaña (`Response`)
+
+Analizamos ahora la variable `Response`.
+
+```{r}
+table(data$Response)
+prop.table(table(data$Response))
+```
+
+Visualización:
+
+```{r}
+ggplot(data, aes(x = factor(Response), fill = factor(Response))) +
+  geom_bar(alpha = 0.85) +
+  scale_x_discrete(labels = c("0" = "No responde",
+                              "1" = "Responde")) +
+  scale_fill_manual(values = c("#1f77b4", "#d62728")) +
+  labs(
+    title = "Distribución de respuesta a la última campaña",
+    x = "¿Aceptó la última campaña?",
+    y = "Número de clientes"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  )
+```
+
+La variable `Response` presenta una distribución claramente desequilibrada. De los 2209 clientes analizados, **1878 (85.0%) no aceptaron la última campaña**, mientras que únicamente **331 (15.0%) sí lo hicieron**.
+
+Este resultado indica que la aceptación de la última campaña constituye un evento relativamente poco frecuente dentro de la base de clientes. Desde el punto de vista descriptivo, la tasa de respuesta del 14.98% puede considerarse moderada en términos de marketing directo, pero estadísticamente implica la existencia de un **desbalanceo entre clases**.
+
+Esta característica debe tenerse en cuenta en los análisis posteriores. En particular:
+
+-   En el **árbol de decisión**, la clase mayoritaria podría influir en la estructura inicial del modelo.
+-   En general, pequeñas variaciones en el número de aceptaciones pueden generar diferencias aparentes en proporciones cuando se segmenta por educación.
+
+En consecuencia, cualquier patrón observado deberá interpretarse considerando que la respuesta positiva representa únicamente el 15% de los casos.
+
+En el siguiente apartado se analizará si esta tasa de aceptación varía de forma apreciable entre los distintos niveles educativos.
+
+### 4.3. Proporción de respuesta según nivel educativo
+
+Para analizar la relación preliminar entre educación y respuesta, construimos una tabla de contingencia y calculamos proporciones dentro de cada nivel educativo.
+
+```{r}
+tabla_edu_response <- table(data$Education, data$Response)
+tabla_edu_response
 ```
 
 ```{r}
-
+prop.table(tabla_edu_response, margin = 1)
 ```
+
+Representamos la proporción de respuesta mediante un gráfico interactivo:
 
 ```{r}
+tabla_plot <- as.data.frame(tabla_edu_response) %>%
+  rename(Education = Var1,
+         Response = Var2,
+         n = Freq) %>%
+  group_by(Education) %>%
+  mutate(
+    total = sum(n),
+    proportion = n / total
+  )
 
+tabla_plot$Response <- factor(tabla_plot$Response,
+                              levels = c("0", "1"),
+                              labels = c("No responde", "Responde"))
+
+p_prop <- ggplot(tabla_plot, aes(x = Education,
+                                 y = proportion,
+                                 fill = Response,
+                                 text = paste0(
+                                   "Educación: ", Education,
+                                   "<br>Grupo: ", Response,
+                                   "<br>Proporción: ",
+                                   scales::percent(proportion, accuracy = 0.1)
+                                 ))) +
+  geom_col(position = "fill") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  scale_fill_manual(values = c("#1f77b4", "#d62728")) +
+  labs(
+    title = "Proporción de respuesta según nivel educativo",
+    subtitle = "Distribución porcentual dentro de cada nivel educativo (interactivo)",
+    x = "Nivel educativo",
+    y = "Porcentaje dentro del nivel"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5)
+  )
+
+ggplotly(p_prop, tooltip = "text")
 ```
+
+La tabla de contingencia y las proporciones por nivel educativo muestran un patrón claramente creciente en la tasa de aceptación de la última campaña.
+
+En términos porcentuales:
+
+-   Basic: 3.7% de respuesta.
+-   2n Cycle: 11.1%.
+-   Graduation: 13.5%.
+-   Master: 15.4%.
+-   PhD: 20.9%.
+
+Se observa, por tanto, una tendencia prácticamente monótona: a mayor nivel educativo, **mayor proporción de respuesta positiva**. La diferencia entre los extremos es especialmente notable, pasando de un 3.7% en el nivel *Basic* a un 20.9% en *PhD*, lo que supone una tasa de respuesta aproximadamente seis veces superior.
+
+Desde el punto de vista descriptivo, este patrón sugiere que el nivel educativo podría estar asociado con una mayor predisposición a aceptar campañas, especialmente en los niveles formativos más altos. No obstante, conviene tener en cuenta que el grupo *Basic* presenta un tamaño muestral reducido (54 clientes), lo que puede aumentar la variabilidad relativa de su proporción.
+
+En cualquier caso, la tendencia observada no parece aleatoria ni errática, sino que muestra una estructura consistente a lo largo de las categorías ordenadas de `Education`. Esta regularidad refuerza la pertinencia de aplicar un contraste formal en el siguiente apartado para determinar si las diferencias observadas son estadísticamente significativas o pueden atribuirse al azar.
+
+### 4.4. Intensidad histórica de aceptación: `Total_Campaigns_Accepted`
+
+Analizamos ahora el comportamiento histórico de aceptación de campañas mediante la variable `Total_Campaigns_Accepted`, que recoge cuántas campañas anteriores (AcceptedCmp1–AcceptedCmp5) aceptó cada cliente.
+
+En primer lugar, resumimos descriptivamente el número de campañas aceptadas por nivel educativo:
 
 ```{r}
-
+data %>%
+  group_by(Education) %>%
+  summarise(
+    n = n(),
+    mean_accepted = mean(Total_Campaigns_Accepted),
+    median_accepted = median(Total_Campaigns_Accepted),
+    sd_accepted = sd(Total_Campaigns_Accepted)
+  )
 ```
+
+Visualización mediante boxplot + violín:
 
 ```{r}
-
+ggplot(data, aes(x = Education,
+                 y = Total_Campaigns_Accepted,
+                 fill = Education)) +
+  geom_violin(trim = FALSE, alpha = 0.6) +
+  geom_boxplot(width = 0.1, fill = "white", alpha = 0.7) +
+  labs(
+    title = "Distribución de campañas históricas aceptadas según educación",
+    x = "Nivel educativo",
+    y = "Número de campañas aceptadas"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  )
 ```
+
+El análisis descriptivo de `Total_Campaigns_Accepted` muestra que la **mediana es igual a 0 en todos los niveles educativos**, lo que indica que más del 50% de los clientes, independientemente de su formación, no aceptó ninguna de las campañas históricas.
+
+Sin embargo, al analizar la media se observa una ligera tendencia creciente con el nivel educativo. Mientras que el grupo *Basic* presenta una media de 0.11 campañas aceptadas, esta aumenta progresivamente hasta 0.34 en el grupo *PhD.* Aunque las diferencias no son de gran magnitud en términos absolutos, el patrón resulta consistente con lo observado en la respuesta a la última campaña.
+
+La fuerte concentración en el valor 0 genera distribuciones altamente asimétricas y con abundancia de ceros, lo que justifica el uso posterior de un contraste no paramétrico como Kruskal–Wallis en lugar de un ANOVA tradicional.
+
+En consecuencia, aunque la mayoría de clientes no muestra una aceptación recurrente de campañas, los niveles educativos más altos parecen concentrar una mayor proporción de individuos que sí aceptan alguna campaña histórica.
+
+### 4.5. Educación y campañas específicas
+
+Hasta ahora hemos analizado la respuesta a campañas de forma agregada (última campaña e intensidad histórica total). Sin embargo, resulta especialmente interesante examinar si **determinadas campañas concretas** presentan patrones diferenciados según el nivel educativo.
+
+Para ello, calculamos la **tasa media de aceptación por campaña y nivel educativo**, es decir, la proporción de clientes que aceptaron cada una de las cinco campañas históricas (AcceptedCmp1–AcceptedCmp5) dentro de cada grupo educativo.
+
+Construimos una tabla agregada:
 
 ```{r}
+campaign_vars <- c("AcceptedCmp1", "AcceptedCmp2",
+                   "AcceptedCmp3", "AcceptedCmp4",
+                   "AcceptedCmp5")
 
+edu_campaign_summary <- data %>%
+  group_by(Education) %>%
+  summarise(across(all_of(campaign_vars),
+                   ~ mean(.),
+                   .names = "mean_{col}"))
+
+edu_campaign_summary
 ```
+
+Reorganizamos en formato largo para visualización:
 
 ```{r}
-
+edu_campaign_long <- edu_campaign_summary %>%
+  pivot_longer(cols = starts_with("mean_"),
+               names_to = "Campaign",
+               values_to = "Acceptance_Rate") %>%
+  mutate(Campaign = gsub("mean_", "", Campaign))
 ```
+
+Como primera visualización tenemos el siguiente **heatmap**:
 
 ```{r}
-
+ggplot(edu_campaign_long,
+       aes(x = Campaign,
+           y = Education,
+           fill = Acceptance_Rate)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "#d62728") +
+  labs(
+    title = "Tasa de aceptación por campaña y nivel educativo",
+    x = "Campaña",
+    y = "Nivel educativo",
+    fill = "Tasa de aceptación"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5)
+  )
 ```
+
+Como segunda visualización tenemos el perfil de aceptación mediante **coordenadas paralelas**:
+
+```{r fig.width=10, fig.height=5}
+ggparcoord(
+  data = edu_campaign_summary,
+  columns = 2:ncol(edu_campaign_summary),
+  groupColumn = 1,
+  scale = "globalminmax"
+) +
+  scale_color_manual(values = c(
+    "Basic" = "#6A1B9A",
+    "2n Cycle" = "#1E88E5",
+    "Graduation" = "#43A047",
+    "Master" = "#FB8C00",
+    "PhD" = "#E53935"
+  )) +
+  labs(
+    title = "Perfil de aceptación (tasa real) por campaña y nivel educativo",
+    subtitle = "Tasa media de aceptación por campaña (AcceptedCmp1–AcceptedCmp5)",
+    x = "Campaña",
+    y = "Tasa de aceptación",
+    color = "Nivel educativo"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5)
+  ) +
+  geom_line(linewidth = 1.4)
+```
+
+El análisis de las tasas de aceptación por campaña revela varios patrones relevantes.
+
+En primer lugar, las tasas de aceptación son moderadas en términos absolutos (en todos los casos inferiores al 12%), lo que confirma que la aceptación de campañas históricas es un comportamiento relativamente minoritario en la base de clientes. No obstante, el interés no reside en el nivel absoluto, sino en las **diferencias relativas entre niveles educativos**.
+
+El heatmap permite identificar visualmente variaciones entre campañas y grupos formativos. Destaca especialmente el comportamiento del grupo *Basic* en la **Campaña 3 (AcceptedCmp3)**, donde la tasa de aceptación alcanza aproximadamente el 11.1%, mientras que en el resto de campañas es nula. Este patrón genera en el gráfico de coordenadas paralelas un pico pronunciado en la tercera campaña para este grupo. Sin embargo, dado el tamaño reducido del grupo *Basic*, esta diferencia debe interpretarse con cautela.
+
+En los niveles educativos intermedios y superiores (*Graduation*, *Master* y *PhD*) se observa un patrón más homogéneo. Las tasas de aceptación tienden a ser sistemáticamente mayores que en *2n Cycle* y, en general, superiores a las de los niveles formativos más bajos en varias campañas. En particular, el grupo *PhD* presenta tasas relativamente elevadas en las campañas 4 y 5, lo que sugiere una mayor receptividad sostenida ante estímulos promocionales.
+
+Asimismo, la **Campaña 2** presenta tasas bajas en todos los niveles educativos, sin diferencias relevantes entre grupos, lo que indica que su rendimiento fue globalmente reducido y no parece depender del nivel formativo del cliente.
+
+El gráfico de coordenadas paralelas refuerza estos hallazgos al mostrar el “perfil” de aceptación de cada grupo educativo a lo largo de las cinco campañas. Se aprecia que las líneas correspondientes a *Graduation*, *Master* y especialmente *PhD* tienden a situarse en valores relativamente superiores en varias campañas, configurando un patrón ligeramente creciente con el nivel educativo.
+
+En conjunto, estos resultados sugieren que el nivel educativo no solo podría estar asociado a la respuesta a una campaña concreta, sino que podría influir en la propensión general a aceptar campañas comerciales, aunque las diferencias observadas son de magnitud moderada.
+
+Este análisis descriptivo aporta una visión más granular del fenómeno y refuerza la hipótesis inicial del estudio. En los siguientes apartados se evaluará formalmente si estas diferencias se mantienen desde un punto de vista estadístico y si el nivel educativo conserva relevancia cuando se considera conjuntamente con otras variables del cliente.
+
+## 5. Contraste formal: diferencias en intensidad histórica de aceptación
+
+El análisis exploratorio ha mostrado una tendencia creciente en el número medio de campañas históricas aceptadas a medida que aumenta el nivel educativo. No obstante, las diferencias descriptivas observadas podrían deberse a variabilidad muestral y no necesariamente reflejar una diferencia estructural en la población.
+
+Con el fin de determinar si dichas diferencias son estadísticamente significativas, se procede a aplicar un contraste formal que permita evaluar si la intensidad histórica de aceptación de campañas difiere entre los distintos niveles educativos.
+
+### 5.1. Planteamiento del contraste
+
+La variable respuesta considerada es `Total_Campaigns_Accepted`, que representa el número de campañas históricas aceptadas por cada cliente. Como se observó en el análisis exploratorio, esta variable presenta:
+
+-   Naturaleza discreta (conteo entre 0 y 5).
+-   Distribución altamente asimétrica.
+-   Fuerte concentración en el valor 0.
+
+Dado que no se cumplen los supuestos de normalidad requeridos por un ANOVA clásico y que se comparan más de dos grupos independientes definidos por la variable ordinal `Education`, se emplea el contraste no paramétrico **Kruskal–Wallis**.
+
+Las hipótesis del contraste son:
+
+-   H₀: La distribución de `Total_Campaigns_Accepted` es la misma para todos los niveles educativos.
+-   H₁: Al menos un nivel educativo presenta una distribución distinta.
+
+Este contraste permitirá evaluar formalmente si la tendencia creciente observada en el EDA responde a una diferencia estadísticamente significativa o puede atribuirse al azar.
+
+### 5.2. Aplicación del test Kruskal–Wallis
+
+Procedemos a aplicar el contraste de Kruskal–Wallis:
 
 ```{r}
+kruskal_result <- kruskal_test(
+  data,
+  Total_Campaigns_Accepted ~ Education
+)
 
+kruskal_result
 ```
+
+El contraste de Kruskal–Wallis arroja un estadístico H=6.756 con 4 grados de libertad y un *p-valor* de 0.149.
+
+Dado que el *p-valor* es superior al nivel de significación habitual (α = 0.05), **no se rechaza la hipótesis nula**. En consecuencia, no se dispone de evidencia estadísticamente significativa para afirmar que la distribución de `Total_Campaigns_Accepted` difiere entre los distintos niveles educativos.
+
+Este resultado implica que, aunque en el análisis descriptivo se observaba una ligera tendencia creciente en la media de campañas aceptadas a medida que aumenta el nivel educativo, dicha tendencia no alcanza significación estadística en términos globales. Es decir, las diferencias observadas podrían explicarse por variabilidad muestral y no necesariamente reflejan un efecto estructural del nivel educativo sobre la intensidad histórica de aceptación.
+
+Desde una perspectiva analítica, este hallazgo es relevante: sugiere que el nivel educativo no parece influir de forma clara en el número total de campañas históricas aceptadas, al menos cuando se analiza la distribución completa mediante un contraste no paramétrico global.
+
+No obstante, este resultado no descarta que puedan existir diferencias en la **respuesta puntual a una campaña concreta** o que el efecto del nivel educativo emerja en combinación con otras variables dentro de un modelo multivariante. Estos aspectos se explorarán en los siguientes apartados.
+
+### 5.3. Tamaño del efecto
+
+Aunque el contraste de Kruskal–Wallis no ha resultado estadísticamente significativo, es conveniente evaluar la **magnitud real de la diferencia** mediante una medida de tamaño del efecto. Para este tipo de contraste no paramétrico se utiliza el estadístico **epsilon cuadrado (ε²)**.
+
+Procedemos a su cálculo:
 
 ```{r}
-
+kruskal_effsize(
+  data,
+  Total_Campaigns_Accepted ~ Education
+)
 ```
+
+El valor estimado de epsilon cuadrado es ε²=0.00125, lo que corresponde a un **tamaño del efecto pequeño** según los criterios habituales de interpretación.
+
+En términos prácticos, esto implica que el nivel educativo explica únicamente una proporción mínima de la variabilidad observada en `Total_Campaigns_Accepted`. Es decir, aunque descriptivamente parecía existir una ligera tendencia creciente en la media de campañas aceptadas a medida que aumenta el nivel formativo, dicha diferencia tiene una magnitud prácticamente despreciable.
+
+Este resultado refuerza la conclusión obtenida en el contraste de Kruskal–Wallis: no solo no se detectan diferencias estadísticamente significativas entre niveles educativos, sino que además la magnitud de la posible diferencia es extremadamente reducida.
+
+Desde una perspectiva de negocio, esto sugiere que el nivel educativo, por sí solo, no constituye un factor determinante en la intensidad histórica de aceptación de campañas. En consecuencia, si existiera alguna relación entre educación y comportamiento ante campañas, es probable que se manifieste en otros aspectos más específicos (por ejemplo, en la respuesta puntual a una campaña concreta o en combinación con otras variables del cliente), más que en la propensión acumulada a aceptar campañas históricas.
+
+## 6. Modelización supervisada: Árbol de decisión para la respuesta a la última campaña
+
+El análisis realizado hasta ahora ha permitido identificar ciertos patrones descriptivos entre nivel educativo y respuesta a campañas. Sin embargo, estos resultados se han obtenido desde una perspectiva bivariante. En la práctica, la decisión de un cliente de aceptar una campaña depende simultáneamente de múltiples factores.
+
+Con el fin de evaluar si el nivel educativo mantiene capacidad explicativa cuando compite con otras variables relevantes del cliente, se ajusta un modelo de **aprendizaje supervisado**, concretamente un **árbol de decisión**, utilizando como variable objetivo la aceptación de la última campaña (`Response`).
+
+Este enfoque permitirá analizar:
+
+-   Si `Education` aparece como variable relevante en el modelo.
+-   En qué contexto o combinación con otras variables influye.
+-   Qué perfiles presentan mayor probabilidad de respuesta.
+
+### 6.1. Objetivo del modelo y justificación
+
+El objetivo del modelo es explicar y predecir la variable binaria `Response` (acepta / no acepta la última campaña).
+
+Se selecciona un **árbol de decisión (CART)** por tres razones principales:
+
+-   **Interpretabilidad**: permite extraer reglas claras y comprensibles desde una perspectiva de negocio.
+-   **Captura de interacciones y no linealidades** sin necesidad de especificarlas previamente.
+-   **Comparación de importancia relativa de variables**, lo que permite evaluar el papel real de `Education` frente a otros atributos del cliente.
+
+Dado que el interés del estudio es comprender el papel del nivel educativo dentro de un contexto multivariante (más que optimizar exclusivamente la precisión predictiva), el árbol de decisión constituye una herramienta metodológicamente adecuada.
+
+### 6.2. Selección de variables predictoras
+
+Con el fin de evaluar el papel del nivel educativo en un contexto multivariante, se seleccionan como variables predictoras aquellas que describen características estructurales y generales del cliente, excluyendo las variables directamente relacionadas con campañas históricas.
+
+En particular, se decide **no incluir** las variables:
+
+-   `AcceptedCmp1` ... `AcceptedCmp5`
+-   `Total_Campaigns_Accepted`
+
+La razón es evitar posibles problemas de **fuga de información (data leakage)**, ya que estas variables reflejan directamente comportamientos de aceptación anteriores y podrían introducir una ventaja artificial en la predicción de `Response`. El objetivo del modelo no es únicamente maximizar la precisión, sino evaluar si el nivel educativo conserva capacidad explicativa cuando compite con otros atributos relevantes del cliente.
+
+Por tanto, se incluyen como variables predictoras:
+
+-   **Variables sociodemográficas**: `Education`, `Age`, `Income`, `Marital_Status`, `Has_Children`.
+-   **Variables de comportamiento y relación con la empresa**: `Recency`, `Total_Purchases`, `NumWebPurchases`, `NumWebVisitsMonth`.
+
+Estas variables permiten capturar distintos ejes explicativos:
+
+-   Capacidad económica
+-   Ciclo de vida
+-   Vinculación reciente con la marca
+-   Nivel de interacción y actividad
+
+De este modo, el árbol de decisión podrá determinar si el nivel educativo aparece como variable relevante en comparación con otros factores potencialmente más determinantes del comportamiento del cliente.
+
+En el siguiente apartado se procederá al ajuste del modelo utilizando estas variables como predictores y `Response` como variable objetivo.
+
+### 6.3. Ajuste y entrenamiento del modelo
+
+Una vez definidas las variables predictoras, se procede al ajuste del árbol de decisión utilizando el algoritmo CART (*Classification and Regression Trees*), implementado mediante la función `rpart`.
+
+En lugar de especificar las variables manualmente en la fórmula, se construye previamente un vector con los predictores seleccionados, lo que permite mantener el código más estructurado y fácilmente modificable.
 
 ```{r}
+predictors <- c("Education", "Age", "Income", "Marital_Status", "Children_Home", "Has_Children",
+                "Recency", "Tenure_Days", "Complain", "Total_Spending", "Total_Purchases",
+                "NumWebPurchases", "NumCatalogPurchases", "NumStorePurchases", "NumWebVisitsMonth")
 
+formula_tree <- as.formula(
+  paste("Response ~", paste(predictors, collapse = " + "))
+)
+
+formula_tree
 ```
+
+A continuación, se ajusta el modelo especificando `method = "class"` al tratarse de un problema de clasificación binaria:
 
 ```{r}
+set.seed(123)
 
+tree_model <- rpart(
+  formula_tree,
+  data = data,
+  method = "class",
+  parms = list(prior = c(0.5, 0.5)),
+  control = rpart.control(
+    cp = 0.01,
+    maxdepth = 5
+  )
+)
 ```
+
+Para facilitar la interpretación, se representa gráficamente el árbol obtenido:
 
 ```{r}
-
+rpart.plot(
+  tree_model,
+  type = 2,
+  extra = 104,
+  fallen.leaves = TRUE,
+  main = "Árbol de decisión para la respuesta a la última campaña"
+)
 ```
+
+### 6.4. Interpretación del árbol de decisión
+
+El árbol de decisión muestra que la variable con mayor capacidad discriminativa es `Total_Spending`, que aparece en la primera partición. Esto indica que el nivel de gasto acumulado constituye el principal factor asociado a la probabilidad de aceptar la última campaña. Desde una perspectiva de negocio, los clientes con mayor vinculación económica tienden a mostrar mayor receptividad ante estímulos promocionales.
+
+En niveles posteriores aparecen variables como `Tenure_Days`, `Recency`, `NumWebVisitsMonth` y `NumCatalogPurchases`, lo que sugiere que la respuesta a la campaña no depende únicamente del volumen de gasto, sino también de la antigüedad del cliente y de su grado de interacción reciente con la empresa.
+
+La variable `Education` sí aparece en el árbol, aunque no en los primeros niveles de decisión. En concreto, discrimina entre niveles formativos más bajos (*Basic*, *2n Cycle*, *Graduation*) y niveles superiores (*Master*, *PhD*) dentro de determinados segmentos caracterizados por un menor gasto y mayor antigüedad. Esto implica que el nivel educativo no predice de forma directa la respuesta a la campaña, pero sí contribuye a diferenciar la probabilidad de aceptación cuando se combina con variables económicas y de relación con la marca. En otras palabras, la educación actúa como un factor modulador más que como un determinante principal.
+
+En conjunto, el modelo sugiere que factores económicos y de vinculación con la empresa presentan mayor capacidad predictiva que el nivel educativo. No obstante, la educación mantiene un papel contextual dentro de ciertos perfiles específicos.
+
+El uso de `prior = c(0.5, 0.5)` ha permitido compensar el desbalanceo de clases, favoreciendo una identificación más equilibrada de los clientes que responden a la campaña.
+
+## 7. Segmentación de comportamiento ante campañas mediante clustering
+
+Hasta este punto, el análisis se ha centrado en evaluar la relación entre nivel educativo y respuesta a campañas desde una perspectiva dirigida (inferencia y modelización supervisada). Sin embargo, estos enfoques parten de una variable objetivo concreta.
+
+Como complemento, se adopta ahora un enfoque **no supervisado** con el objetivo de identificar **perfiles diferenciados de comportamiento ante campañas y promociones** dentro de la base de clientes.
+
+El propósito no es predecir una variable específica, sino detectar segmentos naturales que agrupen clientes con patrones similares de:
+
+-   Aceptación histórica de campañas
+-   Respuesta reciente
+-   Sensibilidad a descuentos
+-   Vinculación con la marca
+
+Una vez identificados los clusters, se analizará la distribución del nivel educativo dentro de cada segmento para evaluar si determinados perfiles educativos se concentran en patrones específicos de comportamiento.
+
+### 7.1. Selección de variables para la segmentación
+
+Para capturar distintas dimensiones del comportamiento ante campañas, se seleccionan las siguientes variables:
+
+-   `Total_Campaigns_Accepted`: número total de campañas históricas aceptadas.
+-   `Response`: aceptación de la última campaña.
+-   `Deals_Ratio`: proporción de compras realizadas con descuento.
+-   `Recency`: días desde la última compra.
+-   `NumWebVisitsMonth`: frecuencia de visitas web mensuales.
+
+Estas variables permiten representar tanto la **propensión histórica**, como la **reactividad puntual** y la **sensibilidad promocional**, alineándose con el enfoque metodológico planteado previamente.
+
+La variable `Education` no se incluye en el proceso de agrupación, ya que el objetivo es analizar posteriormente su distribución dentro de los segmentos identificados.
+
+### 7.2. Preparación de los datos y estandarización
+
+Dado que las variables seleccionadas presentan escalas distintas (por ejemplo, `Recency` puede alcanzar valores mucho mayores que `Response`, que es binaria), es necesario estandarizarlas antes de aplicar el algoritmo de clustering.
+
+Sin esta transformación, las variables con mayor varianza dominarían el cálculo de distancias.
+
+Procedemos a:
+
+1.  Seleccionar las variables.
+2.  Eliminar posibles valores perdidos.
+3.  Aplicar estandarización mediante transformación z-score.
 
 ```{r}
+cluster_vars <- c("Total_Campaigns_Accepted", "Response", "Deals_Ratio", "Recency", "NumWebVisitsMonth")
 
+cluster_df <- data %>%
+  select(all_of(cluster_vars), Education) %>%
+  drop_na()
+
+X <- cluster_df %>% select(all_of(cluster_vars))
+X_scaled <- scale(X)
 ```
+
+La matriz `X_scaled` contiene ahora variables centradas y escaladas (media 0, desviación estándar 1), garantizando que todas contribuyan de forma equilibrada al proceso de agrupación.
+
+En el siguiente apartado se determinará el número óptimo de clusters y se ajustará el modelo k-means.
+
+### 7.3. Determinación del número óptimo de clusters
+
+Antes de ajustar k-means, es necesario escoger el número de clusters **k**. Para ello se emplean dos criterios complementarios:
+
+-   **Método del codo (WSS, Within-Cluster Sum of Squares)**: analiza cómo disminuye la variabilidad interna de los clusters al aumentar k. Se busca un punto donde la reducción deja de ser sustancial (rendimientos decrecientes).
+-   **Coeficiente silhouette promedio**: mide simultáneamente la cohesión interna y la separación entre clusters. Valores más altos indican una mejor calidad de segmentación.
+
+Aplicamos ambos criterios sobre la matriz estandarizada `X_scaled`.
 
 ```{r}
+set.seed(123)
 
+# silhouette
+fviz_nbclust(X_scaled, kmeans, method = "silhouette") +
+  labs(title = "Silhouette promedio para seleccionar k")
+
+# método del codo (WSS)
+fviz_nbclust(X_scaled, kmeans, method = "wss") +
+  labs(title = "Método del codo (WSS) para seleccionar k")
 ```
+
+El coeficiente silhouette alcanza su valor máximo en **k = 2**, lo que indica que la partición en dos grupos presenta la mejor combinación de cohesión interna y separación entre segmentos. Aunque el WSS continúa disminuyendo para valores mayores de k, la mejora es progresivamente menor.
+
+Por tanto, se selecciona k = 2 como solución final.
 
 ```{r}
-
+k_opt <- 2
 ```
+
+### 7.4. Ajuste del modelo k-means
+
+Una vez seleccionado el número de clusters, se ajusta el modelo k-means sobre los datos estandarizados. Se utilizan múltiples inicializaciones (`nstart = 50`) para reducir el riesgo de converger a un mínimo local.
 
 ```{r}
+kmeans_model <- kmeans(X_scaled, centers = k_opt, nstart = 50)
 
+# asignamos el cluster a cada cliente
+cluster_df$Cluster <- factor(kmeans_model$cluster)
+# tamaño de cada grupo
+table(cluster_df$Cluster)
 ```
+
+La solución con k=2 genera una segmentación claramente desequilibrada en términos de tamaño:
+
+-   Cluster 1: 1867 clientes (≈ 85%)
+-   Cluster 2: 336 clientes (≈ 15%)
+
+Esta distribución resulta especialmente reveladora, ya que coincide aproximadamente con la proporción de clientes que aceptaron la última campaña (`Response = 1`). Esto sugiere que el algoritmo ha identificado un grupo minoritario con un patrón de comportamiento significativamente diferente en términos de receptividad a campañas.
+
+En consecuencia, es razonable anticipar que uno de los clusters represente un segmento más receptivo y activo ante estímulos promocionales, mientras que el otro agrupe clientes con baja propensión a aceptar campañas.
+
+No obstante, para confirmar esta interpretación es necesario analizar los perfiles medios de cada grupo.
+
+### 7.5. Perfilado de los clusters en escala original
+
+Una vez ajustado el modelo y asignado cada cliente a su cluster correspondiente, el siguiente paso consiste en analizar las características medias de cada grupo en las variables utilizadas para la segmentación.
+
+Este análisis permite identificar qué dimensiones diferencian realmente a los segmentos.
 
 ```{r}
+profile_original <- cluster_df %>%
+  group_by(Cluster) %>%
+  summarise(
+    n = n(),
+    mean_Total_Campaigns_Accepted = mean(Total_Campaigns_Accepted),
+    mean_Response = mean(Response),
+    mean_Deals_Ratio = mean(Deals_Ratio),
+    mean_Recency = mean(Recency),
+    mean_NumWebVisitsMonth = mean(NumWebVisitsMonth),
+    .groups = "drop"
+  )
 
+profile_original
 ```
+
+La segmentación obtenida con k-means separa de forma muy clara a la base de clientes en dos perfiles:
+
+1.  **Segmento mayoritario, poco receptivo y menos vinculado recientemente**.
+2.  **Segmento minoritario, altamente receptivo y más activo en términos recientes**.
+
+Resulta especialmente relevante que el tamaño del Cluster 2 (≈ 15%) coincida casi exactamente con la tasa global de respuesta observada en el EDA. Esto refuerza la coherencia interna del modelo y sugiere que el algoritmo ha identificado de forma natural el grupo estructuralmente más proclive a aceptar campañas.
+
+### 7.6. Distribución del nivel educativo dentro de cada cluster
+
+Una vez identificados los segmentos conductuales, el siguiente paso consiste en analizar si el nivel educativo se distribuye de forma homogénea entre ellos o si existe una concentración diferencial.
+
+Dado que `Education` no participó en la formación de los clusters, cualquier diferencia observada indicaría que el nivel educativo podría estar asociado indirectamente con los perfiles de comportamiento detectados.
 
 ```{r}
-
+edu_by_cluster <- table(cluster_df$Cluster, cluster_df$Education)
+edu_by_cluster
 ```
+
+Proporciones dentro de cada cluster:
 
 ```{r}
-
+prop.table(edu_by_cluster, margin = 1)
 ```
+
+Visualización porcentual:
 
 ```{r}
+edu_cluster_long <- as.data.frame(edu_by_cluster) %>%
+  rename(Cluster = Var1, Education = Var2, n = Freq) %>%
+  group_by(Cluster) %>%
+  mutate(prop = n / sum(n))
 
+ggplot(edu_cluster_long, aes(x = Cluster, y = prop, fill = Education)) +
+  geom_col(position = "fill") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    title = "Distribución del nivel educativo dentro de cada cluster",
+    x = "Cluster",
+    y = "Porcentaje dentro del cluster"
+  ) +
+  theme_minimal()
 ```
 
-```{r}
+El análisis de las proporciones dentro de cada cluster muestra diferencias apreciables en la composición educativa de los segmentos identificados.
 
-```
+En el **Cluster 1 (segmento mayoritario y poco receptivo)**:
 
-```{r}
+-   *Graduation* representa aproximadamente el 51%.
+-   *PhD* supone alrededor del 20%.
+-   *Master* se sitúa en torno al 16%.
+-   *2n Cycle* y *Basic* tienen menor presencia.
 
-```
+En el **Cluster 2 (segmento altamente receptivo)**:
 
-```{r}
+-   *Graduation* continúa siendo el grupo más numeroso (≈ 46%), aunque con menor peso relativo que en el Cluster 1.
+-   La proporción de *PhD* aumenta hasta aproximadamente 30%, siendo claramente superior a la observada en el Cluster 1.
+-   *Basic* prácticamente desaparece en este segmento (≈ 0.6%).
 
-```
+Este patrón sugiere que los niveles educativos más altos, especialmente **PhD**, se concentran en mayor medida en el segmento altamente receptivo a campañas. Por el contrario, los niveles educativos más bajos presentan menor representación en dicho grupo.
 
-```{r}
+### 7.7. Conclusión del análisis de segmentación
 
-```
+La segmentación mediante k-means ha permitido identificar dos perfiles conductuales claramente diferenciados:
 
-```{r}
+1.  Un **segmento mayoritario**, caracterizado por baja aceptación histórica y ausencia de respuesta reciente.
+2.  Un **segmento minoritario**, altamente receptivo y con mayor vinculación reciente.
 
-```
+El análisis posterior del nivel educativo muestra que los niveles formativos superiores se concentran en mayor medida en el segmento más receptivo, lo que sugiere que la educación podría estar asociada indirectamente con una mayor predisposición estructural a aceptar campañas.
 
-```{r}
+En conjunto, el enfoque no supervisado refuerza parcialmente los resultados descriptivos obtenidos anteriormente: aunque el contraste inferencial sobre la intensidad histórica no resultó significativo, la segmentación revela que la base de clientes sí presenta un perfil minoritario diferenciado en términos de receptividad, en el que los niveles educativos más altos tienen mayor presencia relativa.
 
-```
+Este hallazgo aporta una visión complementaria a la pregunta de investigación, mostrando que la relación entre educación y respuesta a campañas no se manifiesta necesariamente como una diferencia media global, sino como una mayor concentración de niveles educativos superiores en el segmento conductual más receptivo.
 
-```{r}
+## 8. Conclusiones
 
-```
+El objetivo de este estudio era responder a la siguiente pregunta de investigación:
 
-```{r}
+> ¿Hay relación entre el nivel educativo del cliente y su respuesta a las campañas?
 
-```
+Para abordar esta cuestión se adoptó un **enfoque progresivo y complementario**, combinando análisis descriptivo, contraste no paramétrico, modelización supervisada e identificación de segmentos mediante clustering.
 
-```{r}
+En primer lugar, el análisis exploratorio permitió situar el problema y observar patrones iniciales. Se constató que la variable `Response` está **fuertemente desbalanceada**: solo alrededor del 15% de los clientes aceptó la última campaña. Aun así, al segmentar por `Education` apareció un patrón claro y prácticamente monótono: la tasa de respuesta aumenta con el nivel educativo, desde valores muy bajos en *Basic* hasta valores máximos en *PhD*. Este resultado sugiere que, al menos desde una perspectiva descriptiva, **la educación podría estar asociada con una mayor predisposición a responder a campañas**, aunque con cautela en los niveles con menor tamaño muestral.
 
-```
+En segundo lugar, al analizar la propensión histórica mediante `Total_Campaigns_Accepted`, se observó que la **mediana es 0 en todos los niveles educativos**, reflejando que la aceptación repetida de campañas es poco frecuente. Aunque las medias mostraban una ligera tendencia creciente con educación, el contraste de **Kruskal–Wallis no detectó diferencias estadísticamente significativas (p = 0.149)** y el **tamaño del efecto (ε² ≈ 0.001) resultó prácticamente nulo**. Por tanto, **no se dispone de evidencia sólida de que el nivel educativo explique diferencias globales en la intensidad histórica de aceptación de campañas**, y cualquier posible diferencia, en caso de existir, sería de magnitud muy reducida.
 
-```{r}
+En tercer lugar, el árbol de decisión permitió evaluar el papel de `Education` en un contexto multivariante, compitiendo con variables de gasto, antigüedad e interacción. Los resultados mostraron que los principales factores asociados a la respuesta son variables como `Total_Spending`, `Recency` y `Tenure_Days`, mientras que `Education` aparece de forma secundaria y en ramas internas. Esto indica que **la educación no actúa como driver principal**, pero sí puede desempeñar un **papel contextual** dentro de ciertos perfiles: su influencia emerge sobre todo cuando se combina con variables económicas y de vinculación con la marca.
 
-```
+En cuarto lugar, el clustering (k-means con k=2, apoyado por el criterio silhouette) aportó una perspectiva complementaria al identificar **dos segmentos conductuales**: un grupo mayoritario (\~85%) con baja receptividad y un grupo minoritario (\~15%) claramente diferenciado y alineado con la tasa global de `Response`. Al analizar la distribución de `Education` dentro de cada cluster, se observó que el segmento receptivo presenta **una mayor proporción relativa de niveles educativos altos**, especialmente *PhD*, mientras que los niveles bajos tienen una presencia reducida. Este hallazgo es importante porque sugiere que la relación entre educación y campañas **no se manifiesta necesariamente como una diferencia media global**, sino como una **concentración diferencial** de niveles educativos superiores dentro del perfil conductual más receptivo.
 
-```{r}
+La coherencia entre los enfoques aplicados permite formular una conclusión robusta: **existen señales consistentes de asociación entre mayor nivel educativo y mayor probabilidad de respuesta a campañas (especialmente en la respuesta puntual y en la composición del segmento receptivo), pero la educación por sí sola no explica diferencias significativas en la aceptación histórica total, y su efecto en modelos multivariantes es secundario frente a variables de gasto e interacción**.
 
-```
+Desde una perspectiva empresarial, esto sugiere que `Education` puede ser útil como **criterio de apoyo para segmentación**, especialmente si se combina con variables más potentes (valor del cliente, recencia e interacción digital). En otras palabras, **la educación no debería utilizarse como único criterio**, pero puede contribuir a identificar un subgrupo más proclive a aceptar campañas dentro de estrategias de personalización.
 
-```{r}
+Finalmente, debe considerarse como limitación metodológica el desbalanceo de `Response` y la baja intensidad histórica de aceptación (abundancia de ceros), que reduce la sensibilidad de contrastes globales y favorece que las diferencias aparezcan más claramente como **segmentos** que como cambios en medias globales. Aun así, la convergencia entre el patrón descriptivo, la segmentación no supervisada y la presencia contextual de `Education` en el árbol refuerza la interpretación general.
 
-```
+En consecuencia, la evidencia obtenida permite responder a la pregunta de investigación de forma clara:
 
-```{r}
+> El nivel educativo se asocia con la respuesta a campañas principalmente a través de una mayor concentración de niveles educativos altos en el segmento más receptivo, aunque no se observa un efecto global significativo sobre la aceptación histórica total y su peso predictivo es secundario frente a variables de gasto e interacción.
 
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-```
-
-## X. Bibliografía {#bibliografía}
+## 9. Bibliografía {#bibliografía}
 
 [1] Salesforce. What is Market Segmentation? A Guide. <https://www.salesforce.com/eu/marketing/segmentation/>
 
