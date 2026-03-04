@@ -1,18 +1,25 @@
 ---
-title: "CustomerLens-Analytics. Pregunta individual Andrés."
+title: "CustomerLens-Analytics: Preguntas Individuales"
 author: "Andrés Martínez Reviriego"
 output:
   html_document:
     toc: true
     toc_float: true
-    toc_depth: 4
+    toc_depth: 3
+    theme: flatly
+    highlight: tango
+    code_folding: show
 ---
 
-# ¿Descuentos = rentables o pérdidas?
+```{r setup, include=FALSE}
+# Configuración global de chunks para ocultar warnings y mensajes por defecto
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = 'center')
+```
+
+# Pregunta 1: ¿Son los descuentos rentables o provocan pérdidas?
 
 ## 1. Introducción
 
-Pregunta de investigación:  
 **¿Son los clientes que compran con descuentos realmente rentables a largo plazo, o estamos subvencionando a clientes de bajo valor?**
 
 En muchos contextos de negocio, los descuentos se utilizan para estimular la compra a corto plazo. Sin embargo, una mayor intensidad promocional no siempre implica una mayor rentabilidad. Puede ocurrir que parte de los clientes que dependen de descuentos compren con frecuencia, pero generen menos valor económico neto que aquellos que compran sin promociones continuas.
@@ -23,15 +30,19 @@ En este análisis utilizamos como variable principal `Deals_Ratio` (proporción 
 
 ### 1.1. Objetivos
 
-Este análisis persigue los siguientes objetivos:
+Este análisis trata los siguientes objetivos específicos:
 
 -   Describir cómo cambia el valor del cliente según su dependencia de descuentos.
--   Comparar perfiles de clientes con uso bajo, medio y alto de promociones.
--   Evaluar si los clientes más dependientes de descuentos presentan señales de menor valor económico.
+-   Comparar perfiles de clientes con uso bajo, medio y alto de promociones mediante métricas de gasto total, valor anualizado y ticket medio.
+-   Contrastar formalmente si las diferencias entre segmentos son estadísticamente significativas.
+-   Evaluar la asociación entre dependencia promocional y rentabilidad controlando variables demográficas y de comportamiento.
+-   Comprobar la robustez de los resultados y traducir la evidencia en una regla operativa de segmentación para negocio.
 
 De este modo, el estudio no se limita a una comparación descriptiva, sino que prepara un marco analítico coherente para responder a la pregunta de negocio con evidencia cuantitativa.
 
-## 2. Carga de datos y variables de trabajo
+## 2. Carga de datos y variables de trabajo {.tabset}
+
+### 2.1. Carga de librerías y datos
 
 En primer lugar cargamos las librerías necesarias para manipulación de datos (`dplyr`), lectura de ficheros (`readr`) y visualización (`ggplot2`). A continuación, importamos el dataset preprocesado generado en el notebook de limpieza, lo que garantiza consistencia metodológica con el resto del proyecto.
 
@@ -47,6 +58,7 @@ Finalmente, inspeccionamos la estructura (`str`) para verificar tipos y detectar
 library(dplyr)
 library(readr)
 library(ggplot2)
+library(tidyr)
 
 data <- read_csv("./data/marketing_campaign_processed.csv", show_col_types = FALSE)
 
@@ -58,6 +70,37 @@ vars_objetivo <- c(
 
 data %>% select(all_of(vars_objetivo)) %>% str()
 ```
+
+### 2.2. Checks rápidos de calidad
+
+Antes de construir métricas, hacemos comprobaciones rápidas de calidad para asegurar que los cálculos de rentabilidad y segmentación no arrojen errores o sesgos por datos corruptos.
+
+Comprobamos si falta información clave en las variables objetivo. 
+```{r}
+data %>% summarise(across(all_of(vars_objetivo), ~ sum(is.na(.))))
+```
+* **Resultado:** Todas las variables arrojan `0`. Esto confirma que la base de datos está completa.
+
+Calculamos la proporción de clientes que *nunca* han comprado con descuento. Esto nos da la línea base de clientes 100% orgánicos.
+```{r}
+sum(data$Deals_Ratio == 0, na.rm = TRUE)
+mean(data$Deals_Ratio == 0, na.rm = TRUE)
+```
+* **Resultado:** Solo 46 clientes (el `2.1%` aprox) tienen un ratio de 0. Esto significa que la inmensa mayoría de la cartera (97.9%) hace uso de promociones en mayor o menor medida, lo que justifica la relevancia de este análisis.
+
+Por último, verificamos si hay clientes sin vida útil registrada. Para calcular un "Valor Anualizado", dividiremos el gasto total entre los años de vida del cliente. Si alguien lleva 0 días o tiene fecha negativa, rompería la matemática.
+```{r}
+sum(data$Tenure_Days <= 0, na.rm = TRUE)
+```
+* **Resultado:** Encontramos `0` casos. Todos los clientes tienen al menos 1 día de antigüedad válida.
+
+Por último, confirmamos que el dataset procesado que acabamos de cargar viene ya depurado del cliente anómalo (registros con `Deals_Ratio` fuera del rango válido de 0 a 1).
+```{r}
+# Verificamos la salud de la métrica clave
+sum(data$Deals_Ratio > 1, na.rm = TRUE)
+```
+* **Resultado:** Hemos verificado que no existen registros con `Deals_Ratio` imposible (> 1), tal y como se garantizó en el script de preprocesamiento. Esto asegura que todos los análisis posteriores de segmentación y regresión operen sobre proporciones matemáticas coherentes.
+
 
 ## 3. Definición operativa de rentabilidad (proxies)
 
@@ -77,7 +120,8 @@ Esta construcción mejora la interpretabilidad de los resultados y evita problem
 data <- data %>%
   mutate(
     Value_Annual = ifelse(Tenure_Days > 0, Total_Spending / (Tenure_Days / 365), NA_real_),
-    Spend_Per_Purchase = ifelse(Total_Purchases > 0, Total_Spending / Total_Purchases, 0)
+    Spend_Per_Purchase = ifelse(Total_Purchases > 0, Total_Spending / Total_Purchases, 0),
+    Purchases_Annual = ifelse(Tenure_Days > 0, Total_Purchases / (Tenure_Days / 365), NA_real_)
   )
 ```
 
@@ -109,9 +153,12 @@ data <- data %>%
 data %>% count(Discount_Segment)
 ```
 
-## 5. Análisis descriptivo inicial
+
+## 5. Análisis descriptivo inicial {.tabset}
 
 Una vez definidos los segmentos, realizamos un resumen comparativo por grupo para obtener una primera evidencia empírica.
+
+### 5.1. Tabla Resumen
 
 Las métricas incluidas cumplen funciones complementarias:
 
@@ -129,9 +176,42 @@ data %>%
     n = n(),
     mean_spending = mean(Total_Spending, na.rm = TRUE),
     median_spending = median(Total_Spending, na.rm = TRUE),
+    iqr_spending = IQR(Total_Spending, na.rm = TRUE),
+    p10_spending = quantile(Total_Spending, 0.10, na.rm = TRUE),
+    p90_spending = quantile(Total_Spending, 0.90, na.rm = TRUE),
     mean_value_annual = mean(Value_Annual, na.rm = TRUE),
+    median_value_annual = median(Value_Annual, na.rm = TRUE),
+    p10_value_annual = quantile(Value_Annual, 0.10, na.rm = TRUE),
+    p90_value_annual = quantile(Value_Annual, 0.90, na.rm = TRUE),
     mean_spend_per_purchase = mean(Spend_Per_Purchase, na.rm = TRUE)
   )
+```
+
+Para complementar la tabla, visualizamos la distribución de las tres métricas clave por segmento. Este gráfico permite verificar si el patrón observado en medias se mantiene de forma consistente en toda la distribución y no solo en el promedio.
+
+### 5.2. Visualización de Distribuciones
+
+Para complementar la tabla, visualizamos la distribución de las tres métricas clave por segmento. 
+
+```{r fig.width=10, fig.height=4.5}
+plot_data <- data %>%
+  select(Discount_Segment, Total_Spending, Value_Annual, Spend_Per_Purchase) %>%
+  pivot_longer(
+    cols = c(Total_Spending, Value_Annual, Spend_Per_Purchase),
+    names_to = "Metrica",
+    values_to = "Valor"
+  )
+
+ggplot(plot_data, aes(x = Discount_Segment, y = Valor, fill = Discount_Segment)) +
+  geom_boxplot(outlier.alpha = 0.2) +
+  facet_wrap(~Metrica, scales = "free_y") +
+  scale_fill_manual(values = c("Bajo" = "#E8A838", "Medio" = "#4A90D9", "Alto" = "#2ECC71")) +
+  labs(
+    title = "Distribución de métricas de valor por segmento de descuento",
+    x = "Segmento de descuento", y = "Valor"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "none")
 ```
 
 Los resultados descriptivos muestran un patrón consistente: a medida que aumenta la dependencia de descuentos (`Discount_Segment` de **Bajo** a **Alto**), disminuye de forma marcada el valor económico del cliente en todas las métricas analizadas. El grupo de uso bajo de descuentos concentra los mejores indicadores de gasto total, gasto anualizado y ticket medio, mientras que el grupo de uso alto presenta los niveles más reducidos.
@@ -139,4 +219,513 @@ Los resultados descriptivos muestran un patrón consistente: a medida que aument
 Esta evidencia sugiere que los clientes más promodependientes no solo gastan menos en términos agregados, sino que además generan compras de menor valor unitario. Desde una perspectiva de negocio, el resultado preliminar apunta a un posible efecto de “subvención” de clientes de bajo valor cuando la estrategia comercial se apoya intensamente en promociones.
 
 No obstante, al tratarse de un análisis descriptivo, estas conclusiones deben validarse en la siguiente fase mediante contrastes inferenciales y modelos con variables de control, con el fin de confirmar si la relación se mantiene tras ajustar por otros factores relevantes del comportamiento de compra.
+
+
+## 6. Análisis inferencial {.tabset}
+
+Hasta aquí hemos observado que los clientes con **bajo** uso de descuentos gastan más que los de **alto** uso. Pero esta es una muestra de ~2000 clientes. La pregunta ahora es: **¿si volviéramos a recoger datos de otros 2000 clientes, veríamos el mismo patrón, o fue casualidad?**
+
+Para responder esto formalmente, empleamos un **contraste de hipótesis no paramétrico** (Kruskal-Wallis). 
+
+### 6.1. Kruskal-Wallis
+
+```{r}
+kw_vars <- c("Total_Spending", "Value_Annual", "Spend_Per_Purchase")
+kw_results <- data.frame(
+  Variable = kw_vars,
+  H = NA_real_,
+  p_value = NA_real_,
+  Epsilon2 = NA_real_,
+  stringsAsFactors = FALSE
+)
+
+for (i in seq_along(kw_vars)) {
+  v <- kw_vars[i]
+  tmp <- data %>% dplyr::select(Discount_Segment, all_of(v)) %>% na.omit()
+  test <- kruskal.test(reformulate("Discount_Segment", response = v), data = tmp)
+  H <- as.numeric(test$statistic)
+  n <- nrow(tmp)
+  k <- dplyr::n_distinct(tmp$Discount_Segment)
+  eps2 <- (H - k + 1) / (n - k)
+
+  kw_results$H[i] <- round(H, 3)
+  kw_results$p_value[i] <- test$p.value
+  kw_results$Epsilon2[i] <- round(eps2, 4)
+}
+
+knitr::kable(kw_results, digits = 4, caption = "Kruskal-Wallis y tamaño del efecto (epsilon²)")
+```
+
+Los resultados confirman la hipótesis con **rotundidad**:
+
+-   **p-values < 0.001**: Todos los tests muestran p = 0 (< 2.2e-16), indicando diferencias casi imposibles por azar.
+-   **ε² = 0.44, 0.47, 0.43**: Estos son efectos de **alta importancia** (>> 0.14), lo que significa que la variabilidad entre segmentos de descuento explica más del 44% de la varianza en valor del cliente. En un contexto de negocio, como es el caso, esto es una señal clásica de diferencias **muy relevantes**, no solo estadísticamente detectables.
+
+### 6.2. Visualización: Distribución por Segmento
+
+En lugar de tablas de p-values, mostramos directamente lo que el test confirma: los tres grupos están claramente separados.
+
+```{r fig.width=11, fig.height=5, warning=FALSE, message=FALSE}
+library(patchwork)
+
+make_violin <- function(df, var, label, color_low, color_mid, color_high) {
+  ggplot(df %>% filter(!is.na(Discount_Segment)), 
+         aes(x = Discount_Segment, y = .data[[var]], fill = Discount_Segment)) +
+    geom_violin(trim = TRUE, alpha = 0.7) +
+    geom_boxplot(width = 0.1, fill = "white", alpha = 0.8, outlier.alpha = 0.2) +
+    scale_fill_manual(values = c("Bajo" = color_low, "Medio" = color_mid, "Alto" = color_high)) +
+    theme_minimal(base_size = 12) +
+    theme(legend.position = "none") +
+    labs(x = "Segmento", y = label, title = label)
+}
+
+v1 <- make_violin(data, "Total_Spending",    "Gasto total (€)",       "#27ae60", "#f39c12", "#e74c3c")
+v2 <- make_violin(data, "Value_Annual",       "Valor anualizado (€)",  "#27ae60", "#f39c12", "#e74c3c")
+v3 <- make_violin(data, "Spend_Per_Purchase", "Ticket medio (€)",      "#27ae60", "#f39c12", "#e74c3c")
+
+v1 + v2 + v3 +
+  plot_annotation(
+    title = "Distribución del valor del cliente por segmento de dependencia promocional",
+    subtitle = "Verde = bajo uso descuentos · Naranja = uso medio · Rojo = uso alto",
+    theme = theme(plot.title = element_text(size = 14, face = "bold"),
+                  plot.subtitle = element_text(size = 11, colour = "grey40"))
+  )
+```
+
+Los tres gráficos confirman visualmente lo que el test Kruskal-Wallis detectó con p < 2.2e-16: los segmentos **bajo** (verde) están claramente elevados respecto al segmento **alto** (rojo) en las tres métricas: gasto total, valor anualizado y ticket medio.
+
+## 7. Modelización multivariante: ¿La relación es real? {.tabset}
+
+Estos gráficos son descriptivos, pero no demuestran por sí solos que sea **la dependencia de descuentos** la que causa el bajo valor. Podría ocurrir que los ingresos del cliente sean el factor real: los clientes de bajo ingreso usan más descuentos y gastan menos, creando una correlación aparente irreal.
+
+Usamos regresión lineal para controlar este sesgo: manteniendo los valores de ingreso, edad, hijos y recency constantes, ¿sigue siendo `Deals_Ratio` un predictor negativo del valor?
+
+### 7.1. Ajuste y resultado de los modelos
+
+```{r}
+modelo_annual <- lm(
+  Value_Annual ~ Deals_Ratio + Income + Age + Children_Home + Recency + Tenure_Days,
+  data = data
+)
+
+modelo_ticket <- lm(
+  Spend_Per_Purchase ~ Deals_Ratio + Income + Age + Children_Home + Recency + Tenure_Days,
+  data = data
+)
+
+resumen_modelos <- data.frame(
+  Modelo         = c("Valor Anual (Value_Annual)", "Ticket Medio (Spend_Per_Purchase)"),
+  Beta_Deals     = round(c(coef(modelo_annual)["Deals_Ratio"], coef(modelo_ticket)["Deals_Ratio"]), 2),
+  p_value        = c(
+    summary(modelo_annual)$coefficients["Deals_Ratio", "Pr(>|t|)"],
+    summary(modelo_ticket)$coefficients["Deals_Ratio", "Pr(>|t|)"]
+  ),
+  R2    = round(c(summary(modelo_annual)$adj.r.squared, summary(modelo_ticket)$adj.r.squared), 3)
+)
+
+knitr::kable(resumen_modelos, digits = 4,
+             caption = "Efecto de Deals_Ratio sobre el valor del cliente (controlando por ingreso, edad, hijos)",
+             col.names = c("Var. Dependiente", "β (Deals_Ratio)", "p-value", "R²"))
+```
+
+- **Valor Anual β = -526 €**: Un cliente que pase de usar 0% a 100% de descuentos generaría €526 menos al año. Por tanto, un cliente con el 50% de sus compras resueltas con descuento genera **~€263 menos al año** que un cliente idéntico sin descuentos.
+- **Ticket Medio β = -31 €**: Comprar con descuento hace que cada ticket pagado en caja sea de media ~€31 más barato, hundiendo tanto el margen unitario como el saldo anual final.
+- **R² ≈ 0.54 / 0.52**: Los modelos explican alrededor del 54% y 52% de la variación del valor respectivo. `Deals_Ratio` sigue siendo significativo (p=0) incluso controlando el ingreso → **la relación causal es real**.
+
+### 7.2. Visualización de los efectos (gráficos de tendencia)
+
+Para hacer estos hallazgos estadísticos mucho más intuitivos, visualicemos la relación empírica mediante gráficos de dispersión con líneas de tendencia. Así podemos ver "a simple vista" el efecto dual que tiene depender de los descuentos.
+
+```{r fig.width=12, fig.height=5, warning=FALSE, message=FALSE}
+library(patchwork)
+
+p1 <- ggplot(data, aes(x = Deals_Ratio, y = Value_Annual)) +
+  geom_point(alpha = 0.25, color = "#2c3e50", size = 1.5) +
+  geom_smooth(method = "lm", color = "#e74c3c", fill = "#f1948a", alpha = 0.2) +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Efecto sobre el valor anual",
+    subtitle = "Mayor uso de descuentos = menor valor anualizado",
+    x = "Proporción de compras con descuento (0 = nunca, 1 = siempre)",
+    y = "Valor anualizado (€)"
+  ) +
+  scale_y_continuous(labels = scales::dollar_format(prefix = "€"), limits = c(0, NA))
+
+p2 <- ggplot(data, aes(x = Deals_Ratio, y = Spend_Per_Purchase)) +
+  geom_point(alpha = 0.25, color = "#2980b9", size = 1.5) +
+  geom_smooth(method = "lm", color = "#27ae60", fill = "#a9dfbf", alpha = 0.2) +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Efecto sobre el ticket medio",
+    subtitle = "Mayor uso de descuentos = ticket por visita menor",
+    x = "Proporción de compras con descuento (0 = nunca, 1 = siempre)",
+    y = "Ticket medio (€)"
+  ) +
+  scale_y_continuous(labels = scales::dollar_format(prefix = "€"), limits = c(0, NA))
+
+p1 + p2
+```
+
+Los gráficos resumen perfectamente el modelo lineal. A la izquierda (línea roja descendente), vemos cómo los clientes que abusan de los descuentos acaban dejando progresivamente menos dinero al año en la caja de la empresa. A la derecha (línea verde descendente), se demuestra que los clientes no compran más caro en cada visita aprovechando la oferta concreta, sino que el ticket medio se deprecia severamente. Sumando tickets más bajos y compras irregulares, el saldo total anual es profundamente perjudicial para el negocio.
+
+## 8. Robustez: ¿Resisten nuestras conclusiones a valores extremos? {.tabset}
+
+Hemos encontrado que descuentos ↔ bajo valor usando Kruskal-Wallis y regresión. Pero, ¿qué pasa si nuestra conclusión depende de 3 clientes con valores extremos que distorsionan todo?
+
+### 8.1. Winsorización (p1-p99)
+
+```{r}
+winsor <- function(x, p = c(0.01, 0.99)) {
+  q <- quantile(x, probs = p, na.rm = TRUE)
+  pmin(pmax(x, q[1]), q[2])
+}
+
+data_rob <- data %>%
+  mutate(
+    Value_Annual_w = winsor(Value_Annual),
+    Spend_Per_Purchase_w = winsor(Spend_Per_Purchase),
+    Total_Spending_w = winsor(Total_Spending)
+  )
+
+kw_rob <- data.frame(
+  Variable = c("Total_Spending_w", "Value_Annual_w", "Spend_Per_Purchase_w"),
+  p_value = NA_real_,
+  stringsAsFactors = FALSE
+)
+
+for (i in seq_len(nrow(kw_rob))) {
+  v <- kw_rob$Variable[i]
+  tmp <- data_rob %>% select(Discount_Segment, all_of(v)) %>% na.omit()
+  kw_rob$p_value[i] <- kruskal.test(reformulate("Discount_Segment", response = v), data = tmp)$p.value
+}
+
+kw_rob$Variable <- c("Gasto_total_w", "Valor_anual_w", "Gasto_por_compra_w")
+
+knitr::kable(kw_rob, digits = 4, caption = "Robustez: Kruskal-Wallis con variables winsorizadas")
+```
+
+-   **Todos los p-values = 0** (< 2.2e-16): Las diferencias entre segmentos persisten incluso después de recortar extremos (1% superior e inferior de cada variable).
+-   El hallazgo no depende de unos pocos clientes con valores extremos. La relación es estructural y sólida.
+
+### 8.2. Recorte de muestra
+
+```{r}
+lim_inf <- quantile(data$Total_Spending, 0.01, na.rm = TRUE)
+lim_sup <- quantile(data$Total_Spending, 0.99, na.rm = TRUE)
+
+data_trim <- data %>%
+  filter(Total_Spending >= lim_inf, Total_Spending <= lim_sup)
+
+kw_trim <- kruskal.test(Total_Spending ~ Discount_Segment, data = data_trim)
+kw_trim
+```
+
+-   **p-value < 2.2e-16**: Incluso eliminando el 1% más rico y 1% más pobre en gasto (~1960 clientes "típicos"), las diferencias entre segmentos persisten.
+-   **Winsor: p ≈ 0** → persiste con recorte de extremos.
+-   **Trim: p < 2.2e-16** → persiste con muestra central.
+
+Hemos pasado dos pruebas de robustez independientes. Podemos confirmar que nuestras conclusiones no son debido a outliers. 
+
+## 9. Traducción a negocio: detección de perfiles de riesgo promocional
+
+Creamos una regla operativa para detectar clientes de “alto uso de descuento y bajo valor”.
+
+```{r}
+q_deals <- quantile(data$Deals_Ratio, 0.75, na.rm = TRUE)
+q_value <- quantile(data$Value_Annual, 0.25, na.rm = TRUE)
+
+perfil_riesgo <- data %>%
+  mutate(
+    Riesgo_Promo = ifelse(Deals_Ratio >= q_deals & Value_Annual <= q_value, 1, 0)
+  ) %>%
+  summarise(
+    n_total = n(),
+    n_riesgo = sum(Riesgo_Promo, na.rm = TRUE),
+    pct_riesgo = round(mean(Riesgo_Promo, na.rm = TRUE) * 100, 2),
+    gasto_medio_total = round(mean(Total_Spending, na.rm = TRUE), 2),
+    gasto_medio_riesgo = round(mean(Total_Spending[Riesgo_Promo == 1], na.rm = TRUE), 2),
+    gasto_medio_no_riesgo = round(mean(Total_Spending[Riesgo_Promo == 0], na.rm = TRUE), 2),
+    mediana_gasto_riesgo = round(median(Total_Spending[Riesgo_Promo == 1], na.rm = TRUE), 2),
+    mediana_gasto_no_riesgo = round(median(Total_Spending[Riesgo_Promo == 0], na.rm = TRUE), 2),
+    sd_gasto_riesgo = round(sd(Total_Spending[Riesgo_Promo == 1], na.rm = TRUE), 2),
+    sd_gasto_no_riesgo = round(sd(Total_Spending[Riesgo_Promo == 0], na.rm = TRUE), 2),
+    revenue_riesgo = round(sum(Total_Spending[Riesgo_Promo == 1], na.rm = TRUE), 2),
+    revenue_total = round(sum(Total_Spending, na.rm = TRUE), 2),
+    pct_revenue_riesgo = round(revenue_riesgo / revenue_total * 100, 2),
+    lift_riesgo = round(gasto_medio_riesgo / gasto_medio_total, 2)
+  )
+
+perfil_riesgo
+```
+
+Obtenemos un perfil de riesgo con las siguientes conclusiones clave:
+
+-   **~16% de clientes en riesgo**: Usando los criterios (Deals_Ratio ≥ p75 Y Value_Annual ≤ p25), aproximadamente 1 de cada 6 clientes combina alta dependencia de descuentos con bajo valor anualizado.
+-   **Diferencia de gasto extrema**: el gasto medio del grupo de riesgo es una mínima fracción del del resto, confirmando la divergencia de rentabilidad entre segmentos.
+-   **Contribución al revenue marginal**: el grupo de riesgo aporta un porcentaje mínimo del revenue total pese a ser ~16% de la cartera, lo que refuerza su baja rentabilidad.
+-   **Impacto económico**: Si la empresa dedica recursos promocionales a este grupo, está subvencionando clientes que generan valor marginal.
+
+
+Para operativizar la regla, visualizamos la distribución del riesgo por segmento de descuento. El gráfico revela de inmediato dónde se concentra el problema:
+
+```{r fig.width=8, fig.height=4, warning=FALSE, message=FALSE}
+perfil_segmento <- data %>%
+  mutate(
+    Riesgo_Promo = ifelse(Deals_Ratio >= q_deals & Value_Annual <= q_value, "Riesgo", "No riesgo")
+  ) %>%
+  count(Discount_Segment, Riesgo_Promo) %>%
+  group_by(Discount_Segment) %>%
+  mutate(Porcentaje = round(n / sum(n) * 100, 1)) %>%
+  ungroup()
+
+ggplot(perfil_segmento, aes(x = Discount_Segment, y = Porcentaje, fill = Riesgo_Promo)) +
+  geom_bar(stat = "identity", position = "fill", alpha = 0.9) +
+  geom_text(aes(label = paste0(Porcentaje, "%")), 
+            position = position_fill(vjust = 0.5),
+            size = 4, fontface = "bold", color = "white") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  scale_fill_manual(values = c("No riesgo" = "#27ae60", "Riesgo" = "#e74c3c")) +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "¿Dónde se concentra el riesgo promocional?",
+    subtitle = "% de clientes con alto uso de descuentos Y bajo valor anualizado por segmento",
+    x = "Segmento de dependencia de descuentos",
+    y = "Proporción de clientes",
+    fill = "Perfil"
+  )
+```
+
+La distribución de riesgo es fuertemente asimétrica:
+
+-   **Segmento bajo**: 0% en riesgo → Clientes de alto valor, sin necesidad de rediseñar sus incentivos.
+-   **Segmento medio**: ~15% en riesgo → Zona de alerta moderada, se debe monitorizar la evolución.
+-   **Segmento alto**: ~40% en riesgo → 4 de cada 10 clientes de este segmento tienen alto uso de descuentos y valor anualizado mínimo. Es el grupo prioritario para enfocar en la estrategia comercial.
+
+## 10. Conclusiones
+
+Obtenemos las siguientes conclusiones clave a partir del estudio:
+
+1. **La dependencia al descuento perfila clientes de bajo valor relativo**: los tests no paramétricos confirman diferencias significativas. Los clientes que utilizan descuentos de manera agresiva aportan un valor anualizado comparativamente inferior.
+2. **La relación es estructural y destruye margen**: al introducir modelos multivariantes, comprobamos que `Deals_Ratio` no solo mantiene una asociación negativa con el valor anual del cliente, sino que también deprime fuertemente el propio gasto medio en caja. Esta dualidad castiga al negocio, y se sostiene incluso controlando por el nivel de ingresos del usuario.
+3. **Robustez confirmada**: las conclusiones se mantienen inalterables tras aplicar promedios winsorizados y recortes de muestra, lo que garantiza que los resultados no están impulsados por unos pocos valores extremos (outliers).
+4. **Implicación principal de negocio (riesgo promocional)**: Hemos detectado que el riesgo de incentivar la no-rentabilidad se concentra de forma asimétrica; prácticamente 4 de cada 10 clientes altamente dependientes de los descuentos generan beneficios marginales para la empresa. Continuar destinando presupuesto promocional masivo o indiferenciado a este grupo supone una destrucción pura de rentabilidad y un elevado coste de oportunidad.
+
+Con esta estudio, podemos concluir la necesidad crítica de analizar no solo los descuentos que se ofrecen, sino muy especialmente el tipo de cesta de productos que arman estos clientes, para entender por qué la promoción no logra rentabilizarlos. Esto abre la puerta directamente a nuestra segunda pregunta de investigación.
+
+
+<br><br>
+
+***
+
+# Pregunta 2: ¿Existen patrones ocultos en el "mix de productos" que compran los clientes según su dependencia de descuentos?
+
+## 11. Introducción
+En la primera parte del análisis comprobamos que los clientes con alta dependencia de promociones (`Discount_Segment = Alto`) son menos rentables. Sin embargo, surge una pregunta derivada: **¿En qué difieren exactamente sus compras?** 
+
+### 11.1 Objetivos
+- Explorar visualmente cómo cambia la composición relativa de la cesta y el **volumen de gasto absoluto** en cada categoría según el segmento de descuento.
+- Transformar y discretizar las variables de productos numéricas en categorías interpretables.
+- Aplicar minería de datos (algoritmo **Apriori**) y visualización comparada para descubrir patrones de consumo de alto y bajo valor específicos de cada segmento.
+
+## 12. Preparación de datos y discretización
+
+Para usar reglas de asociación, necesitamos variables categóricas o factores (ítems). Convertiremos el gasto en cada categoría (Vinos, Carnes, Frutas, Pescado, Dulces, Oro) en dos niveles: `High` (por encima de la mediana) y `Low` (por debajo o igual a la mediana).
+
+```{r}
+if(!requireNamespace("arules", quietly = TRUE)) install.packages("arules", repos = "http://cran.us.r-project.org")
+library(arules)
+if(!requireNamespace("arulesViz", quietly = TRUE)) install.packages("arulesViz", repos = "http://cran.us.r-project.org")
+library(arulesViz)
+
+product_vars <- c("MntWines", "MntFruits", "MntMeatProducts", 
+                  "MntFishProducts", "MntSweetProducts", "MntGoldProds")
+
+discretize_product <- function(x, name) {
+  med <- median(x, na.rm = TRUE)
+  factor(ifelse(x > med, paste0("High_", name), paste0("Low_", name)))
+}
+
+data_basket <- data %>%
+  filter(!is.na(Discount_Segment)) %>%
+  mutate(
+    Wines = discretize_product(MntWines, "Wines"),
+    Fruits = discretize_product(MntFruits, "Fruits"),
+    Meat = discretize_product(MntMeatProducts, "Meat"),
+    Fish = discretize_product(MntFishProducts, "Fish"),
+    Sweets = discretize_product(MntSweetProducts, "Sweets"),
+    Gold = discretize_product(MntGoldProds, "Gold")
+  ) %>%
+  select(Discount_Segment, Wines, Fruits, Meat, Fish, Sweets, Gold)
+```
+
+## 13. Análisis Exploratorio de Datos (EDA) del mix de productos
+
+Antes de lanzar el algoritmo de Machine Learning, hagamos un análisis visual. ¿Cómo se distribuye el gasto total promedio en cada producto según el segmento de descuentos?
+
+```{r fig.width=10, fig.height=6}
+# Etiquetas más legibles para los productos
+product_labels <- c(
+  MntWines = "Vinos", MntFruits = "Frutas",
+  MntMeatProducts = "Carnes", MntFishProducts = "Pescado",
+  MntSweetProducts = "Dulces", MntGoldProds = "Oro/Lujo"
+)
+
+data_long <- data %>%
+  filter(!is.na(Discount_Segment)) %>%
+  select(Discount_Segment, all_of(product_vars)) %>%
+  group_by(Discount_Segment) %>%
+  summarise(across(everything(), mean, na.rm = TRUE)) %>%
+  pivot_longer(cols = -Discount_Segment, names_to = "Producto", values_to = "Gasto_Medio") %>%
+  mutate(Producto = product_labels[Producto])
+
+ggplot(data_long, aes(x = Discount_Segment, y = Gasto_Medio, fill = Producto)) +
+  geom_bar(stat = "identity", position = "fill") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  scale_fill_brewer(palette = "Set3") +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Composición de la cesta de compra según segmento de descuentos",
+    subtitle = "Proporción del gasto destinado a cada categoría",
+    x = "Segmento de dependencia de descuentos",
+    y = "Porcentaje del gasto total",
+    fill = "Categoría de producto"
+  )
+```
+
+El gráfico muestra cómo evoluciona las cantidades de las distintas categorías de cada producto. Se observa visualmente que la _composición_ de su cesta varía en función de la dependencia en los descuentos.
+
+Para complementar, podemos ver el gasto medio en **euros absolutos** por categoría y segmento, lo que permite entender no solo la composición sino también el volumen real de cada grupo:
+
+```{r fig.width=11, fig.height=5, warning=FALSE, message=FALSE}
+
+data_abs <- data %>%
+  filter(!is.na(Discount_Segment)) %>%
+  select(Discount_Segment, all_of(product_vars)) %>%
+  group_by(Discount_Segment) %>%
+  summarise(across(everything(), mean, na.rm = TRUE)) %>%
+  pivot_longer(cols = -Discount_Segment, names_to = "Producto", values_to = "Gasto_Medio") %>%
+  mutate(Producto = product_labels[Producto])  # lookup por nombre, sin conflicto con arules
+
+ggplot(data_abs, aes(x = Producto, y = Gasto_Medio, fill = Discount_Segment)) +
+  geom_bar(stat = "identity", position = "dodge", alpha = 0.9) +
+  geom_text(aes(label = paste0("€", round(Gasto_Medio))),
+            position = position_dodge(width = 0.9),
+            vjust = -0.4, size = 3.2, fontface = "bold") +
+  scale_fill_manual(values = c("Bajo" = "#27ae60", "Medio" = "#f39c12", "Alto" = "#e74c3c")) +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Gasto medio en euros por categoría de producto y segmento",
+    subtitle = "Barras agrupadas: verde = bajo uso de descuentos | naranja = medio | rojo = alto",
+    x = "Categoría", y = "Gasto Medio (€)",
+    fill = "Segmento"
+  ) +
+  theme(axis.text.x = element_text(angle = 20, hjust = 1))
+```
+
+La diferencia de gasto no se limita solo al tamaño relativo de la cesta, sino a una brecha del gasto en euros. Lo relevante aquí el **volumen de euros perdidos** para la compañía por cada cliente promodependiente. En productos premium como vinos y carnes, la diferencia es de **cientos de euros** anuales (€558 vs €113 en vinos, €362 vs €53 en carnes). Sin embargo, en productos básicos (Frutas, Pescado) o Caprichos (Dulces), la diferencia absoluta apenas es de decenas de euros. Esto nos indica dónde se produce el verdadero "agujero" de rentabilidad de este segmento.
+
+## 14. Minería de reglas de asociación (Apriori) {.tabset}
+
+Buscamos combinaciones concretas de comportamiento. Queremos reglas que tengan en su antecedente (LHS) un tipo de segmento de descuento, para ver qué productos tienden a comprar (RHS).
+
+### 14.1. Transacciones y generación
+
+Buscamos patrones frecuentes. Ajustamos un soporte mínimo del 10% y una confianza del 60% para obtener reglas robustas.
+
+```{r message=FALSE, warning=FALSE}
+transacciones <- as(data_basket, "transactions")
+
+# Apriori
+reglas <- apriori(transacciones, 
+                  parameter = list(supp = 0.1, conf = 0.6, target = "rules", minlen = 2))
+
+print(paste("Se han encontrado", length(reglas), "reglas en total."))
+```
+
+### 14.2. Patrones de consumo por segmento (visualización directa)
+
+En lugar de mostrar reglas individuales (que pueden repetir el mismo consecuente), visualizamos directamente el **porcentaje de clientes con consumo alto** en cada categoría de producto, por segmento. Esto resume en un solo gráfico el mensaje principal de las reglas Apriori.
+
+```{r fig.width=11, fig.height=5, warning=FALSE, message=FALSE}
+# Calculamos % de clientes con nivel "High" por producto y segmento
+pct_high <- data_basket %>%
+  pivot_longer(cols = c(Wines, Fruits, Meat, Fish, Sweets, Gold),
+               names_to = "Producto", values_to = "Nivel") %>%
+  group_by(Discount_Segment, Producto) %>%
+  summarise(
+    pct_high = mean(grepl("^High", as.character(Nivel)), na.rm = TRUE) * 100,
+    .groups = "drop"
+  )
+
+ggplot(pct_high, aes(x = Producto, y = pct_high, fill = Discount_Segment)) +
+  geom_bar(stat = "identity", position = "dodge", alpha = 0.9) +
+  geom_text(aes(label = paste0(round(pct_high), "%")),
+            position = position_dodge(width = 0.9),
+            vjust = -0.4, size = 3.3, fontface = "bold") +
+  scale_fill_manual(values = c("Bajo" = "#27ae60", "Medio" = "#f39c12", "Alto" = "#e74c3c")) +
+  scale_y_continuous(limits = c(0, 100), labels = scales::percent_format(scale = 1)) +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "% de clientes con consumo ALTO por categoría y segmento de descuento",
+    subtitle = "Un porcentaje alto significa que ese grupo compra más de la mediana en esa categoría",
+    x = "Categoría de Producto", y = "% clientes con consumo alto",
+    fill = "Segmento"
+  ) +
+  theme(axis.text.x = element_text(angle = 15, hjust = 1))
+```
+
+El gráfico clarifica un hallazgo fundamental previo a la creación de reglas: la pertenencia al segmento de **Bajo** uso de descuentos (verde) predice casi con total seguridad que el cliente será un "Alto consumidor" (gasto superior a la mediana) en **todas** las categorías, moviéndose entre el 75% (oro) y el 90% (carne). Por el contrario, los clientes del segmento **Alto** (rojo) apenas superan la mediana de consumo en un 20%-25% de los casos (con una ligera excepción en oro, que sube al 32%). Esta rotunda separación justifica matemáticamente por qué Apriori detectará reglas tan fuertes.
+
+### 14.3. Reglas más sólidas por segmento
+
+Presentamos las reglas específicas de mayor confianza generadas por Apriori para cada segmento:
+
+```{r warning=FALSE, message=FALSE}
+reglas_alto <- subset(reglas, subset = lhs %in% "Discount_Segment=Alto")
+reglas_medio <- subset(reglas, subset = lhs %in% "Discount_Segment=Medio")
+reglas_bajo <- subset(reglas, subset = lhs %in% "Discount_Segment=Bajo")
+
+cat("=== TOP 5 reglas para segmento ALTO (por confianza) ===\n")
+inspect(head(sort(reglas_alto, by = "confidence", decreasing = TRUE), 5))
+
+cat("\n=== TOP 5 reglas para segmento MEDIO (por confianza) ===\n")
+inspect(head(sort(reglas_medio, by = "confidence", decreasing = TRUE), 5))
+
+cat("\n=== TOP 5 reglas para segmento BAJO (por lift) ===\n")
+inspect(head(sort(reglas_bajo, by = "lift", decreasing = TRUE), 5))
+```
+
+- **Segmento Alto (Promodependientes)**: Las 5 reglas principales muestran una confianza casi absoluta (~98-99%). Todas ellas concluyen en `=> {Meat=Low_Meat}`. Esto significa que si sabemos que un cliente usa muchos descuentos y además tiene un consumo bajo en otras categorías (vino, pescado, oro), es prácticamente una certeza que **tampoco va a comprar carne**.
+- **Segmento Medio (Transición)**: Presentan patrones intermedios. Aunque comparten ciertas reglas de bajo valor con el segmento Alto, su confianza es menor, reflejando estadísticamente su posición como un grupo híbrido y menos predecible.
+- **Segmento Bajo (Orgánicos)**: El patrón se invierte por completo. Las reglas de la cesta cruzada apuntan invariableme a `=> {Meat=High_Meat}` con eficacias perfectas (confianza del 99% al 100%). Además, el `lift` es de 2.0, lo que significa que la probabilidad de cruzar la compra de carne cara con el resto de la compra es el doble de lo normal.
+
+## 15. Visualización del grafo de asociaciones
+
+Para sintetizar las reglas, dibujamos un grafo de las métricas obtenidas.
+
+```{r fig.width=10, fig.height=8, warning=FALSE, message=FALSE}
+# Para que el grafo muestre la realidad completa, combinamos el Top 5 de cada segmento
+# (Si cogemos el top global, el segmento 'Bajo' acapara todo el ranking por su alto lift)
+top_reglas_mixtas <- c(
+  head(sort(reglas_alto, by = "confidence", decreasing = TRUE), 5),
+  head(sort(reglas_medio, by = "confidence", decreasing = TRUE), 5),
+  head(sort(reglas_bajo, by = "lift", decreasing = TRUE), 5)
+)
+
+plot(top_reglas_mixtas, method = "graph", engine = "htmlwidget", main = "Top 15 Reglas: Contraste entre Segmentos")
+```
+
+## 16. Conclusiones
+
+La exploración de datos y la aplicación del algoritmo Apriori han confirmado y añadido profundidad a nuestra primera hipótesis de rentabilidad. Hemos aprendido que:
+
+1. **Polarización categórica de la cesta**: Los clientes promodependientes no se limitan a "comprar menos de todo" en volumen absoluto. Su cesta de la compra es estructuralmente distinta: excluyen drásticamente los productos considerados *Premium* o de ticket alto (vinos y carnes) y dedican una proporción mucho mayor a compras de bajo importe (dulces, frutas).
+2. **Confirmación del riesgo promocional**: La probabilidad de que un cliente del segmento `Alto` compre carne o vino caro es mínima. Por el contrario, la ocurrencia conjunta (Lift > 2) de pertenecer al segmento `Bajo` y realizar compras Premium masivas cruza la barrera de la certeza estadística. El algoritmo asocia incontestablemente y en exclusiva la rentabilidad al segmento no promocionado.
+3. **Recomendación estratégica**: 
+    - **Para clientes premium (`Bajo`)**: Las campañas de vino y carne funcionan de forma excelente porque es su patrón de consumo natural, siendo los perfiles idóneos para el *up-selling* de alto margen.
+    - **Para cazadores de ofertas (`Alto`)**: Una campaña de descuento directo en vinos de lujo o carnes para este segmento está en gran medida condenada al fracaso. Este tipo de clientes recibirán de forma más eficiente descuentos en productos de bajo importe como dulces u otros básicos.
+
+Con esta aproximación visual, obtenemos una radiografía de consumo que complementa perfectamente la regresión de la Pregunta 1. La conclusión final que extraemos de ambas preguntas es la necesidad crítica de analizar no solo los descuentos que se ofrecen, sino muy especialmente el perfil y comportamiento de los clientes que los utilizan para poder ajustar los descuentos de manera más eficiente.
+
+
 
