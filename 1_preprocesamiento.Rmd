@@ -320,9 +320,25 @@ n_purch0_campaign
 
 No se detectan clientes que hayan aceptado campañas sin registrar compras por canal. Esto aporta consistencia adicional al dataset, ya que la aceptación de campañas aparece asociada a actividad de compra.
 
-#### 2.6.3. Creación de indicadores de posible incoherencia (flags)
+#### 2.6.3. Compras con descuento vs compras totales
 
-Para formalizar la detección de inconsistencias, generamos indicadores binarios en el objeto auxiliar `audit`.
+Verificamos que no existan clientes que registren un número de compras con descuento (`NumDealsPurchases`) superior al total de compras realizadas a través de los distintos canales. Esta es una anomalía lógica que distorsionaría drásticamente cualquier proporción o métrica de rentabilidad relacionada con las promociones.
+
+```{r}
+audit <- audit %>%
+  mutate(
+    Total_Purchases_Check = NumWebPurchases + NumCatalogPurchases + NumStorePurchases,
+    Flag_Deals_Anomalo = ifelse(NumDealsPurchases > Total_Purchases_Check, 1, 0)
+  )
+
+sum(audit$Flag_Deals_Anomalo)
+```
+
+Se detectan **3 clientes** con esta anomalía geométrica (registran muchas más compras con descuento que su número total de tickets o envíos adquiridos).
+
+#### 2.6.4. Creación de indicadores de posible incoherencia (flags)
+
+Para formalizar la detección de las demás inconsistencias, generamos los indicadores binarios en el objeto auxiliar `audit`.
 
 ```{r}
 audit <- audit %>%
@@ -336,23 +352,23 @@ audit %>%
   summarise(
     Purch0_SpendPos = sum(Flag_Purch0_SpendPos),
     PurchPos_Spend0 = sum(Flag_PurchPos_Spend0),
-    Purch0_Campaign = sum(Flag_Purch0_Campaign)
+    Purch0_Campaign = sum(Flag_Purch0_Campaign),
+    Deals_Anomalo   = sum(Flag_Deals_Anomalo)
   )
 ```
 
 Los indicadores confirman que:
 
 -   Existen 6 casos del tipo gasto positivo sin compras por canal.
+-   Existen 3 casos del tipo compras con descuento superiores al total de compras.
 -   No existen casos del tipo compras sin gasto.
 -   No existen casos del tipo campañas aceptadas sin compras.
 
-Por tanto, la única incoherencia real detectada corresponde al primer caso.
+Por tanto, las únicas incoherencias reales detectadas corresponden a los dos primeros casos.
 
-#### 2.6.4. Depuración: eliminación de observaciones inconsistentes
+#### 2.6.5. Depuración: eliminación de observaciones inconsistentes
 
-Dado que el gasto monetario debería derivarse de compras registradas por canal, consideramos que las 6 observaciones detectadas representan inconsistencias estructurales del dataset.
-
-Por ello, procedemos a eliminarlas del conjunto de datos.
+Consideramos que las observaciones detectadas representan inconsistencias estructurales o errores de captura en el dataset, por lo que procedemos a eliminarlas del conjunto de datos principal.
 
 ```{r}
 n_before <- nrow(data)
@@ -360,7 +376,8 @@ n_before <- nrow(data)
 data <- data %>%
   filter(!( (NumWebPurchases + NumCatalogPurchases + NumStorePurchases) == 0 &
               (MntWines + MntFruits + MntMeatProducts +
-               MntFishProducts + MntSweetProducts + MntGoldProds) > 0 ))
+               MntFishProducts + MntSweetProducts + MntGoldProds) > 0 )) %>%
+  filter(!( NumDealsPurchases > (NumWebPurchases + NumCatalogPurchases + NumStorePurchases) ))
 
 n_after <- nrow(data)
 n_removed <- n_before - n_after
@@ -369,10 +386,7 @@ n_after
 n_removed
 ```
 
-Tras la depuración, se eliminan 6 observaciones inconsistentes, garantizando que:
-
--   Todo gasto registrado proviene de al menos una compra por canal.
--   Se mantiene la coherencia interna entre variables monetarias y de actividad.
+Tras la depuración, se eliminan **9 observaciones inconsistentes** (6 por discordancia gasto/compras y 3 por ratio de descuentos imposible), garantizando la coherencia matemática del dataset.
 
 Adicionalmente, verificamos que ya no existen incoherencias de este tipo:
 
@@ -385,6 +399,7 @@ audit_check <- data %>%
   )
 
 sum(audit_check$Purchases_Channels == 0 & audit_check$Spending_Products > 0)
+sum(audit_check$NumDealsPurchases > audit_check$Purchases_Channels)
 ```
 
 ### 2.7. Resumen tras la limpieza y tratamiento inicial
