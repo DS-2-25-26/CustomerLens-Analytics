@@ -13,12 +13,15 @@ output:
     code_folding: show
 ---
 
+```{=html}
 <style>
 body {
   text-align: justify;
 }
 </style>
----
+```
+
+------------------------------------------------------------------------
 
 # La Estrategia Multicanal: ¿Más Canales = Más Compras?
 
@@ -34,7 +37,7 @@ Esta primera pregunta individual aborda precisamente esa cuestión:
 
 Responder a esta pregunta tiene implicaciones directas en estrategia comercial: si los clientes multicanal compran más en términos absolutos, la empresa tiene un incentivo claro para incentivar la adopción de múltiples canales. Si no, quizás la inversión en omnicalidad no se justifica por volumen de compra.
 
-En este primer notebook, analizamos la pregunta desde un enfoque exploratorio y descriptivo, utilizando diversas herramientas de visualización para identificar patrones en los datos antes de formular conclusiones formales. El análisis estadístico y el contraste de hipótesis sobre el mecanismo de ese posible aumento (¿suma o sinergia?) se tratará en el **Notebook de Pregunta Individual 2**.
+En este primer análisis, abordamos la cuestión desde un enfoque exploratorio y descriptivo, utilizando diversas herramientas de visualización para perfilar nuestra base de clientes y cuantificar las diferencias de comportamiento (frecuencia y ticket medio) entre los diferentes segmentos de adopción multicanal.
 
 ### Objetivos {.unnumbered}
 
@@ -402,12 +405,12 @@ tabla_resumen
 
 > > **¿Aumenta el volumen de compras cuantos más canales utiliza el cliente?**
 >
-> La respuesta está clara: **sí, usar más canales se correlaciona de forma robusta con más compras y más gasto**. Y el efecto no es proporcional — la relación es progresiva y no lineal, lo que ya apunta a que existe algo más que una simple suma. Pero la naturaleza exacta de ese «algo más» (¿sinergia o suma?) queda como pregunta abierta para el **Notebook 4**.
+> La respuesta está clara: **sí, usar más canales se correlaciona de forma robusta con más compras y más gasto**. Y el efecto no es proporcional — la relación es progresiva y no lineal, lo que sugiere que la adopción de un ecosistema omnicanal es uno de los mayores vectores naturales de crecimiento del ticket medio.
 
 ### Síntesis por objetivos {.unnumbered}
 
 | Objetivo | Resultado |
-|------------------------------------|------------------------------------|
+|----|----|
 | 1\. Perfil multicanal de la clientela | **≈73% son tricanales** — la multicanalidad es la norma, no la excepción |
 | 2\. Estructura del gasto total | Dos perfiles coexisten: **Perfil A** (masa, ticket bajo) y **Perfil B** (Premium, 600–2.500€) |
 | 3\. ¿Es real el aumento de gasto? | **Sí** — mediana e IQR crecen sistemáticamente de Mono a Tricanal |
@@ -428,6 +431,12 @@ El Perfil A (masa) y el Perfil B (Premium) coexisten y ambos se potencian con la
 
 Cada canal adicional añade compras por encima de los canales previos. Esto sugiere que los programas de activación cruzada tienen un potencial, al menos en términos de comportamiento de compra.
 
-> **Pregunta abierta para el Notebook 4:** ¿Ese aumento de gasto es una simple suma de ventas independientes, o existe un efecto multiplicador (sinergias) al combinar canales?
+> **Siguiente paso estratégico:** Dado que la adopción de canales adicionales correlaciona fuertemente con un mayor gasto, el siguiente reto es diseñar incentivos cruzados (ofertas web-to-store, catálogos interactivos) para empujar a los monocanales/bicanales hacia la fidelización multicanal.
 
 ------------------------------------------------------------------------
+
+## Referencias
+
+-   Harvard Business Review. "A Study of 46,000 Shoppers Shows That Omnichannel Retailing Works". Recuperado de: <https://hbr.org/2017/01/a-study-of-46000-shoppers-shows-that-omnichannel-retailing-works>
+-   InboundCycle. "Qué es el marketing omnicanal, cómo aplicarlo y mucho más". Recuperado de: <https://www.inboundcycle.com/blog-de-inbound-marketing/que-es-el-marketing-omnicanal-como-aplicarlo-y-mucho-mas>
+-   IEBS Business School. "Estrategia Omnicanal en eCommerce: qué es y cómo aplicarla". Recuperado de: <https://www.iebschool.com/hub/estrategia-omnicanal-e-commerce/>
