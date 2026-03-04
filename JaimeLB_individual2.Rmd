@@ -158,7 +158,6 @@ library(plotly)
 library(GGally)
 # estadística inferencial y comparaciones post-hoc
 library(rstatix)
-library(FSA)
 library(effectsize)
 # árbol de decisión (modelo supervisado)
 library(rpart)
