@@ -43,6 +43,7 @@ library(tidyr)
 library(scales)
 library(rpart)
 library(rpart.plot)
+library(plotly)
 ```
 
 ```{r}
@@ -160,20 +161,33 @@ gasto_categorias
 ### 2.2. Visualización: gasto medio por categoría
 
 ```{r fig.width=10, fig.height=5}
-ggplot(gasto_categorias, aes(x = reorder(Categoria, -Gasto_Medio), y = Gasto_Medio, fill = Has_Children)) +
+p_gasto_cat <- ggplot(gasto_categorias, aes(x = reorder(Categoria, -Gasto_Medio), y = Gasto_Medio, fill = Has_Children,
+                                            text = paste0("Categoría: ", Categoria,
+                                                          "<br>Estructura: ", Has_Children,
+                                                          "<br>Gasto medio: ", round(Gasto_Medio, 1), " €"))) +
     geom_col(position = position_dodge(width = 0.8), width = 0.7, alpha = 0.9) +
     scale_fill_manual(values = palette_main) +
     scale_y_continuous(labels = comma_format(big.mark = ".", decimal.mark = ",")) +
-    labs(
-        title = "Gasto medio por categoría de producto según presencia de hijos",
-        x = "Categoría de producto", y = "Gasto medio (€)",
-        fill = "Estructura familiar"
-    ) +
+    labs(x = "Categoría de producto", y = "Gasto medio (€)", fill = "Estructura familiar") +
     theme_minimal(base_size = 13) +
-    theme(
-        plot.title = element_text(face = "bold"),
-        legend.position = "top"
+    theme(legend.position = "none")
+
+ggplotly(p_gasto_cat, tooltip = "text") %>%
+  layout(
+    title = list(
+      text = "<b>Gasto medio por categoría de producto según presencia de hijos</b>",
+      x = 0.5,
+      xanchor = "center"
+    ),
+    margin = list(t = 100, b = 100, l = 80, r = 40),
+    showlegend = TRUE,
+    legend = list(
+      orientation = "h", 
+      x = 0.5, 
+      xanchor = "center", 
+      y = -0.25
     )
+  )
 ```
 
 **Interpretación visual**: El gráfico de barras agrupadas confirma dos hechos estructurales. Primero, el vino es la categoría dominante en ambos grupos, pero su gasto medio cae drásticamente en familias con hijos. Segundo, la carne registra la segunda reducción más severa: categorías asociadas a un consumo más selectivo son precisamente las que más penalizan a los hogares con menores. En cambio, el gasto en fruta o dulces se resiente comparativamente menos, apuntando a una redistribución del presupuesto hacia productos más básicos cuando hay niños en casa.
@@ -197,13 +211,16 @@ proporciones <- data %>%
     ) %>%
     pivot_longer(-Has_Children, names_to = "Categoria", values_to = "Proporcion")
 
-ggplot(proporciones, aes(x = Has_Children, y = Proporcion, fill = Categoria)) +
+p_prop <- ggplot(proporciones, aes(x = Has_Children, y = Proporcion, fill = Categoria,
+                                   text = paste0("Estructura: ", Has_Children,
+                                                 "<br>Categoría: ", Categoria,
+                                                 "<br>Proporción: ", percent(Proporcion, accuracy = 0.1)))) +
     geom_col(position = "fill", width = 0.6, alpha = 0.9) +
     scale_fill_manual(values = palette_products) +
     scale_y_continuous(labels = percent_format()) +
     labs(
         title = "Proporción relativa del gasto por categoría según presencia de hijos",
-        subtitle = "Distribución porcentual del presupuesto medio entre categorías",
+        subtitle = "Distribución porcentual del presupuesto medio entre categorías (interactivo)",
         x = NULL, y = "Proporción del gasto total",
         fill = "Categoría"
     ) +
@@ -212,6 +229,8 @@ ggplot(proporciones, aes(x = Has_Children, y = Proporcion, fill = Categoria)) +
         plot.title = element_text(face = "bold"),
         legend.position = "right"
     )
+
+ggplotly(p_prop, tooltip = "text")
 ```
 
 **Interpretación de negocio**: El vino domina abrumadoramente el mix de gasto. Los hogares con hijos amplían ligeramente la proporción relativa de básicos, pero la participación del vino y la carne cae de forma visible. Este fenómeno no implica necesariamente que las familias con hijos consuman menos vino en términos absolutos: refleja que esta plataforma capta menos de ese gasto familiar.
@@ -313,7 +332,7 @@ gasto_nhijos <- data %>%
         MntFishProducts, MntSweetProducts, MntGoldProds
     ) %>%
     pivot_longer(-Children_Home, names_to = "Categoria", values_to = "Gasto") %>%
-    mutate(Categoria = recode(Categoria,
+    mutate(Categoria = dplyr::recode(Categoria,
         "MntWines" = "Vino", "MntFruits" = "Fruta", "MntMeatProducts" = "Carne",
         "MntFishProducts" = "Pescado", "MntSweetProducts" = "Dulces", "MntGoldProds" = "Oro"
     ))
@@ -410,17 +429,21 @@ resultados_cor$rho <- NA
 resultados_cor$p_valor <- NA
 
 for (i in seq_len(nrow(resultados_cor))) {
-    test <- cor.test(
-        as.numeric(as.character(data[[resultados_cor$Familia[i]]])),
-        data[[resultados_cor$Gasto[i]]],
-        method = "spearman"
+    test <- suppressWarnings(
+        cor.test(
+            as.numeric(as.character(data[[resultados_cor$Familia[i]]])),
+            data[[resultados_cor$Gasto[i]]],
+            method = "spearman",
+            exact = FALSE
+        )
     )
     resultados_cor$rho[i] <- round(test$estimate, 3)
     resultados_cor$p_valor[i] <- test$p.value
 }
 
 resultados_cor$Significativo <- ifelse(resultados_cor$p_valor < 0.05, "Sí", "No")
-resultados_cor
+
+print(resultados_cor)
 ```
 
 > **Hallazgo clave — Análisis 4:** Las correlaciones de Spearman son negativas y significativas para todas las combinaciones de variables familiares (Kidhome, Teenhome) con el gasto. Las asociaciones más fuertes (ρ más negativo) se dan con el vino y el gasto total, mientras que las correlaciones con fruta y dulces son más débiles. Tener adolescentes en casa penaliza el gasto de forma comparable a tener niños pequeños, lo que indica que el efecto no se diluye con la edad de los hijos.
@@ -489,7 +512,7 @@ gasto_marital <- data %>%
     ) %>%
     pivot_longer(-Marital_Status, names_to = "Categoria", values_to = "Gasto_Medio")
 
-ggplot(gasto_marital, aes(x = Marital_Status, y = Gasto_Medio, fill = Categoria)) +
+p <- ggplot(gasto_marital, aes(x = Marital_Status, y = Gasto_Medio, fill = Categoria)) +
     geom_col(position = "fill", width = 0.7, alpha = 0.9) +
     scale_fill_manual(values = palette_products) +
     scale_y_continuous(labels = percent_format()) +
@@ -500,6 +523,8 @@ ggplot(gasto_marital, aes(x = Marital_Status, y = Gasto_Medio, fill = Categoria)
     ) +
     theme_minimal(base_size = 13) +
     theme(plot.title = element_text(face = "bold"))
+
+ggplotly(p)
 ```
 
 > **Hallazgo clave — Análisis 5:** El estado civil influye en el gasto, pero de forma moderada y mediada por la composición familiar. Los solteros (*Single*) y viudos (*Widow*) son los grupos con mayor gasto medio: ambos tienen una proporción muy baja de hijos en el hogar, lo que los convierte en el perfil de cliente de mayor valor para esta plataforma. Los casados y los que conviven en pareja tienen medianas más bajas, correlacionadas con mayor presencia de hijos. En términos de mix de producto, el vino domina en todos los estados civiles, sin diferencias sustanciales en la composición relativa del gasto.
@@ -549,7 +574,9 @@ importancia_df
 ```
 
 ```{r fig.width=8, fig.height=4}
-ggplot(importancia_df, aes(x = reorder(Variable, Importancia_Rel), y = Importancia_Rel)) +
+p_importancia <- ggplot(importancia_df, aes(x = reorder(Variable, Importancia_Rel), y = Importancia_Rel,
+                                           text = paste0("Variable: ", Variable,
+                                                         "<br>Importancia: ", round(Importancia_Rel, 1), "%"))) +
     geom_col(fill = "#2E86AB", alpha = 0.9, width = 0.6) +
     geom_text(aes(label = paste0(round(Importancia_Rel, 1), "%")),
         hjust = -0.2, size = 4
@@ -557,12 +584,14 @@ ggplot(importancia_df, aes(x = reorder(Variable, Importancia_Rel), y = Importanc
     coord_flip() +
     scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
     labs(
-        title = "Importancia relativa de las variables en el modelo",
+        title = "Importancia relativa de las variables en el modelo (interactivo)",
         subtitle = "Contribución de cada variable a la predicción del gasto total",
         x = NULL, y = "Importancia relativa (%)"
     ) +
     theme_minimal(base_size = 13) +
     theme(plot.title = element_text(face = "bold"))
+
+ggplotly(p_importancia, tooltip = "text")
 ```
 
 ### 6.3. Evaluación del modelo
@@ -607,3 +636,13 @@ Desde una perspectiva de *Customer Analytics*, estos resultados sugieren:
 ## 7. Reflexión estratégica del modelo de negocio
 
 Los patrones observados (dominio del vino o mayor gasto en clientes sin hijos con rentas altas) sugieren que la empresa opera en el sector de distribución de productos alimentarios y de bebidas premium, cuyo cliente prototipo es el consumidor urbano adulto sin cargas familiares. Las familias con hijos no son un segmento principal de esta plataforma: sus hábitos de consumo (cocina en casa, compra en supermercados, mayor precio-sensibilidad) las alejan estructuralmente del perfil de comprador habitual.
+
+## Referencias
+
+STHDA. "Correlation Test between Two Variables in R: Pearson, Spearman, and Kendall". Recuperado de: <http://www.sthda.com/english/wiki/correlation-test-between-two-variables-in-r>
+
+UC Business Analytics. "Regression Trees and Recursive Partitioning in R". Recuperado de: <https://uc-r.github.io/regression_trees>
+
+R for Data Science. "Data Transformation: dplyr and data manipulation". Recuperado de: <https://r4ds.hadley.nz/data-transform>
+
+R-bloggers. "Customer Analytics: Using Deep Learning With Keras To Predict Customer Churn". Recuperado de: <https://www.r-bloggers.com/2017/11/customer-analytics-using-deep-learning-with-keras-to-predict-customer-churn/>

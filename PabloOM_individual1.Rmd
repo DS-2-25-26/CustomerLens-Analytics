@@ -65,6 +65,7 @@ library(scales)
 library(forcats)
 library(ggpubr)  
 library(ggrepel)  
+library(plotly)
 ```
 
 ```{r load-data}
@@ -128,30 +129,37 @@ dist_data <- data %>%
   count(Num_Channels_f) %>%
   mutate(pct = n / sum(n))
 
-p1 <- ggplot(dist_data, aes(x = Num_Channels_f, y = n, fill = Num_Channels_f)) +
+p1 <- ggplot(dist_data, aes(x = Num_Channels_f, y = n, fill = Num_Channels_f,
+                            text = paste0("Perfil: ", Num_Channels_f,
+                                          "<br>Nº clientes: ", n,
+                                          "<br>Proporción: ", percent(pct, accuracy = 0.1)))) +
   geom_col(color = "white", width = 0.6, alpha = 0.9) +
   geom_text(aes(label = paste0(n, "\n(", percent(pct, accuracy = 0.1), ")")),
             vjust = -0.3, fontface = "bold", size = 4) +
   scale_fill_manual(values = c("#74C2E1", "#2A9D8F", "#264653")) +
   scale_y_continuous(expand = expansion(mult = c(0, 0.20))) +
   labs(title    = "Distribución por Perfil Multicanal",
-       subtitle = "¿Cuántos clientes son mono, bi o tricanal?",
+       subtitle = "¿Cuántos clientes son mono, bi o tricanal? (interactivo)",
        x = NULL, y = "Nº clientes") +
   theme_minimal(base_size = 12) +
   theme(plot.title = element_text(face = "bold"), legend.position = "none",
         panel.grid.major.x = element_blank())
 
-p2 <- ggplot(data, aes(x = Total_Purchases, fill = Num_Channels_f)) +
+p2 <- ggplot(data, aes(x = Total_Purchases, fill = Num_Channels_f,
+                       text = paste0("Perfil: ", Num_Channels_f,
+                                     "<br>Total compras: ", Total_Purchases))) +
   geom_histogram(binwidth = 2, color = "white", alpha = 0.85) +
   facet_wrap(~ Num_Channels_f, ncol = 1, scales = "free_y") +
   scale_fill_manual(values = c("#74C2E1", "#2A9D8F", "#264653")) +
   labs(title    = "Volumen de Compras por Perfil",
+       subtitle = "(interactivo)",
        x = "Total de compras", y = "Frecuencia") +
   theme_minimal(base_size = 12) +
   theme(plot.title = element_text(face = "bold"), legend.position = "none",
         strip.text = element_text(face = "bold", size = 9))
 
-ggarrange(p1, p2, ncol = 2, widths = c(1, 1.2))
+ggplotly(p1, tooltip = "text")
+ggplotly(p2, tooltip = "text")
 ```
 
 > **Hallazgo:** La gran mayoría son **tricanales (≈73%)** — el comportamiento multicanal es la norma, no la excepción. El histograma lo deja claro: los monocanales se concentran por debajo de las 8 compras, mientras que los tricanales son el único perfil capaz de superar las 15–20 compras de forma sistemática.
@@ -348,7 +356,11 @@ line_data <- data %>%
             .groups = "drop")
 
 p_linea <- ggplot(line_data, aes(x = Num_Channels, y = Media_Gasto,
-                                  color = Income_Band, group = Income_Band)) +
+                                  color = Income_Band, group = Income_Band,
+                                  text = paste0("Ingresos: ", Income_Band,
+                                                "<br>Canales: ", Num_Channels,
+                                                "<br>Gasto medio: ", dollar(Media_Gasto, prefix = "", suffix = "€", accuracy = 1),
+                                                "<br>Nº clientes: ", n))) +
   geom_line(linewidth = 1.3) +
   geom_point(aes(size = n), alpha = 0.9) +
   geom_text(aes(label = dollar(Media_Gasto, prefix = "", suffix = "€", accuracy = 1)),
@@ -359,7 +371,7 @@ p_linea <- ggplot(line_data, aes(x = Num_Channels, y = Media_Gasto,
   scale_y_continuous(labels = dollar_format(prefix = "", suffix = " €"),
                      expand = expansion(mult = c(0.05, 0.15))) +
   labs(
-    title    = "Gasto Medio según Ingresos y Número de Canales Activos",
+    title    = "Gasto Medio según Ingresos y Número de Canales Activos (interactivo)",
     x        = "Nº de canales activos",
     y        = "Gasto medio (€)",
     caption  = "El tamaño del punto indica el volumen de clientes en ese grupo"
@@ -370,7 +382,7 @@ p_linea <- ggplot(line_data, aes(x = Num_Channels, y = Media_Gasto,
         plot.caption  = element_text(color = "gray60", face = "italic"),
         legend.position = "right")
 
-p_linea
+ggplotly(p_linea, tooltip = "text")
 ```
 
 > **Hallazgo final:** El efecto multicanal es **robusto en todos los segmentos de renta**.
