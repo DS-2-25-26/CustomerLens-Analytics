@@ -529,7 +529,7 @@ En la primera parte del análisis comprobamos que los clientes con alta dependen
 
 ## 12. Preparación de datos y discretización
 
-Para usar reglas de asociación, necesitamos variables categóricas o factores (ítems). Convertiremos el gasto en cada categoría (Vinos, Carnes, Frutas, Pescado, Dulces, Oro) en dos niveles: `High` (por encima de la mediana) y `Low` (por debajo o igual a la mediana).
+Para usar reglas de asociación, necesitamos variables categóricas o factores (ítems). Convertiremos el gasto en cada categoría (Vinos, Carnes, Frutas, Pescado, Dulces, Premium) en dos niveles: `High` (por encima de la mediana) y `Low` (por debajo o igual a la mediana).
 
 ```{r}
 if(!requireNamespace("arules", quietly = TRUE)) install.packages("arules", repos = "http://cran.us.r-project.org")
@@ -674,7 +674,7 @@ ggplot(pct_high, aes(x = Producto, y = pct_high, fill = Discount_Segment)) +
   theme(axis.text.x = element_text(angle = 15, hjust = 1))
 ```
 
-El gráfico clarifica un hallazgo fundamental previo a la creación de reglas: la pertenencia al segmento de **Bajo** uso de descuentos (verde) predice casi con total seguridad que el cliente será un "Alto consumidor" (gasto superior a la mediana) en **todas** las categorías, moviéndose entre el 75% (oro) y el 90% (carne). Por el contrario, los clientes del segmento **Alto** (rojo) apenas superan la mediana de consumo en un 20%-25% de los casos (con una ligera excepción en oro, que sube al 32%). Esta rotunda separación justifica matemáticamente por qué Apriori detectará reglas tan fuertes.
+El gráfico clarifica un hallazgo fundamental previo a la creación de reglas: la pertenencia al segmento de **Bajo** uso de descuentos (verde) predice casi con total seguridad que el cliente será un "Alto consumidor" (gasto superior a la mediana) en **todas** las categorías, moviéndose entre el 75% (productos premium) y el 90% (carne). Por el contrario, los clientes del segmento **Alto** (rojo) apenas superan la mediana de consumo en un 20%-25% de los casos (con una ligera excepción en productos premium, que sube al 32%). Esta rotunda separación justifica matemáticamente por qué Apriori detectará reglas tan fuertes.
 
 ### 14.3. Reglas más sólidas por segmento
 
@@ -695,7 +695,7 @@ cat("\n=== TOP 5 reglas para segmento BAJO (por lift) ===\n")
 inspect(head(sort(reglas_bajo, by = "lift", decreasing = TRUE), 5))
 ```
 
-- **Segmento Alto (Promodependientes)**: Las 5 reglas principales muestran una confianza casi absoluta (~98-99%). Todas ellas concluyen en `=> {Meat=Low_Meat}`. Esto significa que si sabemos que un cliente usa muchos descuentos y además tiene un consumo bajo en otras categorías (vino, pescado, oro), es prácticamente una certeza que **tampoco va a comprar carne**.
+- **Segmento Alto (Promodependientes)**: Las 5 reglas principales muestran una confianza casi absoluta (~98-99%). Todas ellas concluyen en `=> {Meat=Low_Meat}`. Esto significa que si sabemos que un cliente usa muchos descuentos y además tiene un consumo bajo en otras categorías (vino, pescado, productos premium), es prácticamente una certeza que **tampoco va a comprar carne**.
 - **Segmento Medio (Transición)**: Presentan patrones intermedios. Aunque comparten ciertas reglas de bajo valor con el segmento Alto, su confianza es menor, reflejando estadísticamente su posición como un grupo híbrido y menos predecible.
 - **Segmento Bajo (Orgánicos)**: El patrón se invierte por completo. Las reglas de la cesta cruzada apuntan invariableme a `=> {Meat=High_Meat}` con eficacias perfectas (confianza del 99% al 100%). Además, el `lift` es de 2.0, lo que significa que la probabilidad de cruzar la compra de carne cara con el resto de la compra es el doble de lo normal.
 
