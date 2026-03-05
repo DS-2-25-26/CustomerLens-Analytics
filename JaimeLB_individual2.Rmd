@@ -158,7 +158,6 @@ library(plotly)
 library(GGally)
 # estadística inferencial y comparaciones post-hoc
 library(rstatix)
-library(FSA)
 library(effectsize)
 # árbol de decisión (modelo supervisado)
 library(rpart)
@@ -229,7 +228,7 @@ ggplot(data, aes(x = Education, fill = Education)) +
   )
 ```
 
-La distribución del nivel educativo muestra una clara concentración en los **niveles formativos intermedios y superiores**. En particular, la categoría **Graduation** representa aproximadamente el **50.5% de la muestra (1115 clientes)**, situándose como el grupo claramente dominante. A continuación, destacan **PhD (21.6%)** y **Master (16.5%)**, mientras que los niveles **2n Cycle (9.0%)** y especialmente **Basic (2.4%)** presentan una presencia mucho más reducida.
+La distribución del nivel educativo muestra una clara concentración en los **niveles formativos intermedios y superiores**. En particular, la categoría **Graduation** representa aproximadamente el **50.41% de la muestra (1110 clientes)**, situándose como el grupo claramente dominante. A continuación, destacan **PhD (21.6%)** y **Master (16.5%)**, mientras que los niveles **2n Cycle (9.0%)** y especialmente **Basic (2.5%)** presentan una presencia mucho más reducida.
 
 Esta estructura indica que la base de clientes analizada se caracteriza mayoritariamente por **perfiles con estudios universitarios o de posgrado**, siendo los niveles educativos más bajos claramente minoritarios. Desde el punto de vista analítico, esta asimetría debe tenerse en cuenta en los análisis posteriores, ya que las estimaciones asociadas a categorías con menor tamaño muestral (como *Basic*) pueden presentar mayor variabilidad.
 
@@ -264,9 +263,9 @@ ggplot(data, aes(x = factor(Response), fill = factor(Response))) +
   )
 ```
 
-La variable `Response` presenta una distribución claramente desequilibrada. De los 2209 clientes analizados, **1878 (85.0%) no aceptaron la última campaña**, mientras que únicamente **331 (15.0%) sí lo hicieron**.
+La variable `Response` presenta una distribución claramente desequilibrada. De los 2209 clientes analizados, **1871 (84.97%) no aceptaron la última campaña**, mientras que únicamente **331 (15.03%) sí lo hicieron**.
 
-Este resultado indica que la aceptación de la última campaña constituye un evento relativamente poco frecuente dentro de la base de clientes. Desde el punto de vista descriptivo, la tasa de respuesta del 14.98% puede considerarse moderada en términos de marketing directo, pero estadísticamente implica la existencia de un **desbalanceo entre clases**.
+Este resultado indica que la aceptación de la última campaña constituye un evento relativamente poco frecuente dentro de la base de clientes. Desde el punto de vista descriptivo, la tasa de respuesta del 15.03% puede considerarse moderada en términos de marketing directo, pero estadísticamente implica la existencia de un **desbalanceo entre clases**.
 
 Esta característica debe tenerse en cuenta en los análisis posteriores. En particular:
 
@@ -340,13 +339,13 @@ En términos porcentuales:
 
 -   Basic: 3.7% de respuesta.
 -   2n Cycle: 11.1%.
--   Graduation: 13.5%.
+-   Graduation: 13.6%.
 -   Master: 15.4%.
--   PhD: 20.9%.
+-   PhD: 21.01%.
 
-Se observa, por tanto, una tendencia prácticamente monótona: a mayor nivel educativo, **mayor proporción de respuesta positiva**. La diferencia entre los extremos es especialmente notable, pasando de un 3.7% en el nivel *Basic* a un 20.9% en *PhD*, lo que supone una tasa de respuesta aproximadamente seis veces superior.
+Se observa, por tanto, una tendencia prácticamente monótona: a mayor nivel educativo, **mayor proporción de respuesta positiva**. La diferencia entre los extremos es especialmente notable, pasando de un 3.7% en el nivel *Basic* a un 21.1% en *PhD*, lo que supone una tasa de respuesta aproximadamente seis veces superior.
 
-Desde el punto de vista descriptivo, este patrón sugiere que el nivel educativo podría estar asociado con una mayor predisposición a aceptar campañas, especialmente en los niveles formativos más altos. No obstante, conviene tener en cuenta que el grupo *Basic* presenta un tamaño muestral reducido (54 clientes), lo que puede aumentar la variabilidad relativa de su proporción.
+Desde el punto de vista descriptivo, este patrón sugiere que el nivel educativo podría estar asociado con una mayor predisposición a aceptar campañas, especialmente en los niveles formativos más altos. No obstante, conviene tener en cuenta que el grupo *Basic* presenta un tamaño muestral reducido (52 clientes), lo que puede aumentar la variabilidad relativa de su proporción.
 
 En cualquier caso, la tendencia observada no parece aleatoria ni errática, sino que muestra una estructura consistente a lo largo de las categorías ordenadas de `Education`. Esta regularidad refuerza la pertinencia de aplicar un contraste formal en el siguiente apartado para determinar si las diferencias observadas son estadísticamente significativas o pueden atribuirse al azar.
 
@@ -531,7 +530,7 @@ kruskal_result <- kruskal_test(
 kruskal_result
 ```
 
-El contraste de Kruskal–Wallis arroja un estadístico H=6.756 con 4 grados de libertad y un *p-valor* de 0.149.
+El contraste de Kruskal–Wallis arroja un estadístico H=6.874 con 4 grados de libertad y un *p-valor* de 0.143.
 
 Dado que el *p-valor* es superior al nivel de significación habitual (α = 0.05), **no se rechaza la hipótesis nula**. En consecuencia, no se dispone de evidencia estadísticamente significativa para afirmar que la distribución de `Total_Campaigns_Accepted` difiere entre los distintos niveles educativos.
 
@@ -554,7 +553,7 @@ kruskal_effsize(
 )
 ```
 
-El valor estimado de epsilon cuadrado es ε²=0.00125, lo que corresponde a un **tamaño del efecto pequeño** según los criterios habituales de interpretación.
+El valor estimado de epsilon cuadrado es ε²=0.00131, lo que corresponde a un **tamaño del efecto pequeño** según los criterios habituales de interpretación.
 
 En términos prácticos, esto implica que el nivel educativo explica únicamente una proporción mínima de la variabilidad observada en `Total_Campaigns_Accepted`. Es decir, aunque descriptivamente parecía existir una ligera tendencia creciente en la media de campañas aceptadas a medida que aumenta el nivel formativo, dicha diferencia tiene una magnitud prácticamente despreciable.
 
@@ -749,7 +748,7 @@ fviz_nbclust(X_scaled, kmeans, method = "wss") +
   labs(title = "Método del codo (WSS) para seleccionar k")
 ```
 
-El coeficiente silhouette alcanza su valor máximo en **k = 2**, lo que indica que la partición en dos grupos presenta la mejor combinación de cohesión interna y separación entre segmentos. Aunque el WSS continúa disminuyendo para valores mayores de k, la mejora es progresivamente menor.
+El coeficiente silhouette alcanza su valor máximo en **k=2**, lo que indica que la partición en dos grupos presenta la mejor combinación de cohesión interna y separación entre segmentos. Aunque el WSS continúa disminuyendo para valores mayores de k, la mejora es progresivamente menor.
 
 Por tanto, se selecciona k = 2 como solución final.
 
@@ -759,7 +758,7 @@ k_opt <- 2
 
 ### 7.4. Ajuste del modelo k-means
 
-Una vez seleccionado el número de clusters, se ajusta el modelo k-means sobre los datos estandarizados. Se utilizan múltiples inicializaciones (`nstart = 50`) para reducir el riesgo de converger a un mínimo local.
+Una vez seleccionado el número de clusters, se ajusta el modelo k-means sobre los datos estandarizados. Se utilizan múltiples inicializaciones (`nstart=50`) para reducir el riesgo de converger a un mínimo local.
 
 ```{r}
 kmeans_model <- kmeans(X_scaled, centers = k_opt, nstart = 50)
@@ -772,8 +771,8 @@ table(cluster_df$Cluster)
 
 La solución con k=2 genera una segmentación claramente desequilibrada en términos de tamaño:
 
--   Cluster 1: 1867 clientes (≈ 85%)
--   Cluster 2: 336 clientes (≈ 15%)
+-   Cluster 1: 342 clientes (≈ 15%)
+-   Cluster 2: 1860 clientes (≈ 85%)
 
 Esta distribución resulta especialmente reveladora, ya que coincide aproximadamente con la proporción de clientes que aceptaron la última campaña (`Response = 1`). Esto sugiere que el algoritmo ha identificado un grupo minoritario con un patrón de comportamiento significativamente diferente en términos de receptividad a campañas.
 
@@ -805,10 +804,11 @@ profile_original
 
 La segmentación obtenida con k-means separa de forma muy clara a la base de clientes en dos perfiles:
 
-1.  **Segmento mayoritario, poco receptivo y menos vinculado recientemente**.
-2.  **Segmento minoritario, altamente receptivo y más activo en términos recientes**.
+-   **Segmento mayoritario, poco receptivo y menos vinculado recientemente**.
 
-Resulta especialmente relevante que el tamaño del Cluster 2 (≈ 15%) coincida casi exactamente con la tasa global de respuesta observada en el EDA. Esto refuerza la coherencia interna del modelo y sugiere que el algoritmo ha identificado de forma natural el grupo estructuralmente más proclive a aceptar campañas.
+-   **Segmento minoritario, altamente receptivo y más activo en términos recientes**.
+
+Resulta especialmente relevante que el tamaño del Cluster 1 (≈ 15%) coincida casi exactamente con la tasa global de respuesta observada en el EDA. Esto refuerza la coherencia interna del modelo y sugiere que el algoritmo ha identificado de forma natural el grupo estructuralmente más proclive a aceptar campañas.
 
 ### 7.6. Distribución del nivel educativo dentro de cada cluster
 
@@ -848,14 +848,14 @@ ggplot(edu_cluster_long, aes(x = Cluster, y = prop, fill = Education)) +
 
 El análisis de las proporciones dentro de cada cluster muestra diferencias apreciables en la composición educativa de los segmentos identificados.
 
-En el **Cluster 1 (segmento mayoritario y poco receptivo)**:
+En el **Cluster 2 (segmento mayoritario y poco receptivo)**:
 
 -   *Graduation* representa aproximadamente el 51%.
 -   *PhD* supone alrededor del 20%.
 -   *Master* se sitúa en torno al 16%.
 -   *2n Cycle* y *Basic* tienen menor presencia.
 
-En el **Cluster 2 (segmento altamente receptivo)**:
+En el **Cluster 1 (segmento altamente receptivo)**:
 
 -   *Graduation* continúa siendo el grupo más numeroso (≈ 46%), aunque con menor peso relativo que en el Cluster 1.
 -   La proporción de *PhD* aumenta hasta aproximadamente 30%, siendo claramente superior a la observada en el Cluster 1.
@@ -867,8 +867,8 @@ Este patrón sugiere que los niveles educativos más altos, especialmente **PhD*
 
 La segmentación mediante k-means ha permitido identificar dos perfiles conductuales claramente diferenciados:
 
-1.  Un **segmento mayoritario**, caracterizado por baja aceptación histórica y ausencia de respuesta reciente.
-2.  Un **segmento minoritario**, altamente receptivo y con mayor vinculación reciente.
+1.  Un **segmento minoritario**, altamente receptivo y con mayor vinculación reciente.
+2.  Un **segmento mayoritario**, caracterizado por baja aceptación histórica y ausencia de respuesta reciente.
 
 El análisis posterior del nivel educativo muestra que los niveles formativos superiores se concentran en mayor medida en el segmento más receptivo, lo que sugiere que la educación podría estar asociada indirectamente con una mayor predisposición estructural a aceptar campañas.
 

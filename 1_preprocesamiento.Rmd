@@ -386,7 +386,7 @@ n_after
 n_removed
 ```
 
-Tras la depuración, se eliminan **9 observaciones inconsistentes** (6 por discordancia gasto/compras y 3 por ratio de descuentos imposible), garantizando la coherencia matemática del dataset.
+Tras la depuración, se eliminan **7 observaciones inconsistentes**, garantizando la coherencia matemática del dataset.
 
 Adicionalmente, verificamos que ya no existen incoherencias de este tipo:
 
@@ -399,6 +399,7 @@ audit_check <- data %>%
   )
 
 sum(audit_check$Purchases_Channels == 0 & audit_check$Spending_Products > 0)
+sum(audit_check$NumDealsPurchases > audit_check$Purchases_Channels)
 sum(audit_check$NumDealsPurchases > audit_check$Purchases_Channels)
 ```
 
@@ -615,7 +616,7 @@ dim(data)
 str(data)
 ```
 
-Tras eliminar observaciones y añadir y eliminar variables nos hemos quedado con un total de **2203 observaciones** y **36 variables**.
+Tras eliminar observaciones y añadir y eliminar variables nos hemos quedado con un total de **2202 observaciones** y **36 variables**.
 
 ### 4.2. Variables del dataset final
 

@@ -24,6 +24,7 @@ Cada alumno se ha encargado de resolver un par de preguntas específicadas a con
 
 ### Andrés Martínez Reviriego
 - ¿Son los clientes que compran con descuentos realmente rentables a largo plazo, o estamos "subvencionando" a clientes de bajo valor?
+- ¿Existen patrones ocultos en el “mix de productos” que compran los clientes según su dependencia de descuentos?
 
 ### Pablo Oliva Muñoz
 - ¿Aumenta el volumen de compras de forma significativa cuantos más canales utiliza el cliente?

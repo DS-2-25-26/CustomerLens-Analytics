@@ -29,7 +29,7 @@ body {
 
 ## Introducción
 
-En el Notebook de Pregunta Individual 1 demostramos exploratoriamente que los clientes que utilizan más canales de compra acumulan un mayor volumen de compras y un mayor gasto total. Sin embargo, una pregunta más profunda y estratégicamente más relevante permanecía abierta:
+La adopción de estrategias omnicanal es uno de los mayores vectores de inversión en el retail moderno. Analíticamente es sencillo observar que un cliente que usa múltiples canales (Web, Tienda, Catálogo) gasta más que uno monocanal. Sin embargo, para justificar contablemente la inversión en integrar estos canales, debemos responder a una pregunta financiera y analítica más profunda:
 
 > **¿Ese aumento de gasto es una simple suma de ventas independientes, o existe un efecto multiplicador (sinergias) al combinar canales?**
 
@@ -103,7 +103,7 @@ cat("Observaciones tras eliminar Income NA:", nrow(data), "\n")
 
 ***Objetivo 1:** Confirmar estadísticamente que el gasto difiere según el número de canales activos.*
 
-Antes de buscar sinergias, necesitamos descartar que las diferencias observadas en el Notebook anterior sean fruto del azar. Si los grupos no difieren estadísticamente, no tiene sentido buscar un efecto multiplicador.
+Antes de rastrear sinergias, necesitamos descartar que las diferencias de gasto observadas entre perfiles sean fruto del azar. Si la varianza interna de los grupos es mayor que la diferencia media entre ellos, el modelo multiplicador carece de base estadística.
 
 ### Verificación de homocedasticidad — Test de Levene {.unnumbered}
 
@@ -170,19 +170,19 @@ print(post_hoc$p.value)
 
 ------------------------------------------------------------------------
 
-## Modelización: Buscando el "Efecto Sinerga"
+## Modelización: Buscando el "Efecto Sinergia"
 
 ***Objetivos 2-3:** Comparar modelos de gasto para identificar posibles efectos multiplicadores entre canales.*
 
 Construimos tres modelos de forma progresiva, cada uno respondiendo a una pregunta diferente:
 
 | Modelo | Pregunta que responde | Formulación R |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | **Modelo 1 — Suma** | ¿Cada canal contribuye de forma independiente? | `~Web + Catálogo + Tienda` |
 | **Modelo 2 — Sinergia** | ¿Los canales se potencian entre sí? | `~(Web + Catálogo + Tienda)^3` |
 | **Modelo 3 — Controlado** | ¿La sinergia persiste al aislar el efecto de los ingresos? | `~(Web + Catálogo + Tienda)^3 + Income` |
 
-El tercer modelo introduce `Income` como variable de control. La motivación viene del Notebook anterior, donde observamos que los clientes tricanales también tienen ingresos más altos. Para descartar que la sinergia detectada sea simplemente un reflejo de mayor capacidad adquisitiva, controlamos por ingresos y comprobamos si el efecto se mantiene.
+El tercer modelo introduce `Income` como variable de control. Una hipótesis de negocio habitual es que los clientes tricanales simplemente tienen ingresos más altos. Para descartar que la sinergia detectada sea simplemente un reflejo de mayor capacidad adquisitiva, controlamos por ingresos y comprobamos si el efecto se mantiene.
 
 ### Paso 1: ¿Los canales son independientes? {.unnumbered}
 
@@ -384,7 +384,7 @@ data.frame(
 ### Síntesis por objetivos {.unnumbered}
 
 | Objetivo | Resultado |
-|----------------------------------|--------------------------------------|
+|----|----|
 | 1\. Confirmar estadísticamente que el gasto difiere según el número de canales (ANOVA) | **Sí** — ANOVA de Welch (p ≈ 0); Bonferroni confirma tricanal vs resto (p \< 1e‑9); 1 vs 2 canales no significativo (n = 38) |
 | 2\. Modelizar el gasto como suma aditiva (hipótesis: sin sinergia) | R² ajustado = 72,6 % — captura el efecto individual de cada canal, pero infraestima el efecto combinado |
 | 3\. Extender el modelo con interacciones para evaluar el efecto multiplicador | R² ajustado sube a 74,17 % (76,15 % controlando ingresos); F-test significativo (p \< 1e‑16) — sinergia real e independiente del nivel de renta |
@@ -406,4 +406,8 @@ De los 1.622 tricanales, los de renta alta son el subgrupo de mayor valor absolu
 
 ------------------------------------------------------------------------
 
-*Este notebook cierra el ciclo analítico del Notebook de Pregunta Individual 1. Juntos responden de forma completa a la pregunta sobre el papel de los canales de compra en el comportamiento del cliente.*
+## Referencias
+
+-   Cyberclick. "Las 4 P del marketing: qué son y ejemplos". Recuperado de: <https://www.cyberclick.es/numerical-blog/las-4-p-del-marketing-que-debes-aprender>
+-   MDirector. "Cómo diseñar una estrategia omnicanal ganadora". Recuperado de: <https://www.mdirector.com/blog/estrategia-omnicanal/>
+-   Salesforce. "Omnichannel Strategy Benefits". Recuperado de: <https://www.salesforce.com/eu/blog/omnichannel-strategy-benefits/>
