@@ -7,19 +7,34 @@ output:
     toc_float: true
     toc_depth: 4
     # number_sections: true
+editor_options: 
+  markdown: 
+    wrap: sentence
 ---
+
+```{=html}
+<style>
+body {
+  text-align: justify;
+}
+</style>
+```
 
 # Dime cuánto ganas y te diré qué compras
 
 ## Contextualización y motivación
 
-Cuando hablamos de comportamiento de compra, no solo importa **cuánto** gasta un cliente, sino también **qué tan variada** es su cesta. Un cliente que gasta 500 € repartidos en 6 categorías de producto presenta un perfil muy distinto de otro que concentra el mismo importe en una sola categoría. La **diversidad de la cesta** es un indicador clave tanto de la propensión al *cross-selling* como del nivel de exploración del catálogo por parte del consumidor.
+Cuando hablamos de comportamiento de compra, no solo importa **cuánto** gasta un cliente, sino también **qué tan variada** es su cesta.
+Un cliente que gasta 500 € repartidos en 6 categorías de producto presenta un perfil muy distinto de otro que concentra el mismo importe en una sola categoría.
+La **diversidad de la cesta** es un indicador clave tanto de la propensión al *cross-selling* como del nivel de exploración del catálogo por parte del consumidor.
 
-En notebooks anteriores se ha analizado en profundidad la relación entre ingresos y gasto total (véase *Anatomía del cliente de alto valor*), así como la distribución del gasto por categoría en función de la estructura familiar (véase *Dime con quién vives y te diré qué compras*). En este notebook nos planteamos una pregunta complementaria que **no se ha abordado hasta ahora en el proyecto**:
+En notebooks anteriores se ha analizado en profundidad la relación entre ingresos y gasto total (véase *Anatomía del cliente de alto valor*), así como la distribución del gasto por categoría en función de la estructura familiar (véase *Dime con quién vives y te diré qué compras*).
+En este notebook nos planteamos una pregunta complementaria que **no se ha abordado hasta ahora en el proyecto**:
 
 > **¿El nivel de ingresos influye en la diversidad y/o cantidad de productos comprados?**
 
-El concepto clave aquí no es el importe gastado, sino la **amplitud** y la **intensidad** de la compra. A partir de esta pregunta principal se derivan las siguientes subpreguntas:
+El concepto clave aquí no es el importe gastado, sino la **amplitud** y la **intensidad** de la compra.
+A partir de esta pregunta principal se derivan las siguientes subpreguntas:
 
 -   ¿Los clientes con mayores ingresos compran en más categorías de producto distintas?
 -   ¿A partir de qué nivel de ingresos la diversificación se estabiliza (efecto saturación)?
@@ -40,6 +55,7 @@ library(tidyr)
 library(scales)
 library(rpart)
 library(rpart.plot)
+library(plotly)
 ```
 
 ```{r}
@@ -57,7 +73,8 @@ data$Marital_Status <- factor(data$Marital_Status,
 
 ### Creación de variables auxiliares
 
-Para responder a la pregunta necesitamos construir **métricas de diversidad** que no existen en el dataset original. Definimos tres indicadores complementarios:
+Para responder a la pregunta necesitamos construir **métricas de diversidad** que no existen en el dataset original.
+Definimos tres indicadores complementarios:
 
 -   **`Product_Diversity`**: número de categorías de producto en las que el cliente ha gastado al menos 1 € (0 a 6). Mide la **amplitud** de la cesta.
 -   **`Shannon_Entropy`**: entropía de Shannon calculada sobre las proporciones del gasto en las 6 categorías. Mide la **homogeneidad** de la distribución del gasto: una entropía alta indica que el gasto se reparte equitativamente entre categorías, mientras que una entropía baja indica concentración en pocas categorías.
@@ -131,7 +148,8 @@ palette_products <- c(
 
 ### 1.1. Exploración descriptiva de la diversidad
 
-La variable `Product_Diversity` indica en cuántas de las 6 categorías disponibles (vino, fruta, carne, pescado, dulces, oro) ha gastado cada cliente. Valores cercanos a 6 indican una cesta muy diversificada.
+La variable `Product_Diversity` indica en cuántas de las 6 categorías disponibles (vino, fruta, carne, pescado, dulces, oro) ha gastado cada cliente.
+Valores cercanos a 6 indican una cesta muy diversificada.
 
 ```{r}
 stats_diversity <- data %>%
@@ -178,13 +196,16 @@ diversity_dist <- data %>%
     mutate(prop = n / sum(n)) %>%
     ungroup()
 
-ggplot(diversity_dist, aes(x = factor(Product_Diversity), y = prop, fill = Income_Group)) +
+p_div_dist <- ggplot(diversity_dist, aes(x = factor(Product_Diversity), y = prop, fill = Income_Group,
+                                         text = paste0("Ingresos: ", Income_Group,
+                                                       "<br>Diversidad: ", Product_Diversity,
+                                                       "<br>Proporción: ", percent(prop, accuracy = 0.1)))) +
     geom_col(position = position_dodge(width = 0.8), width = 0.7, alpha = 0.9) +
     scale_fill_manual(values = palette_income) +
     scale_y_continuous(labels = percent_format()) +
     labs(
         title = "Distribución de la diversidad de productos por grupo de ingresos",
-        subtitle = "Proporción de clientes que compran en 0, 1, 2, ..., 6 categorías",
+        subtitle = "Proporción de clientes que compran en 0, 1, 2, ..., 6 categorías (interactivo)",
         x = "Nº de categorías de producto compradas", y = "Proporción de clientes",
         fill = "Grupo de ingresos"
     ) +
@@ -193,11 +214,14 @@ ggplot(diversity_dist, aes(x = factor(Product_Diversity), y = prop, fill = Incom
         plot.title = element_text(face = "bold"),
         legend.position = "top"
     )
+
+ggplotly(p_div_dist, tooltip = "text") %>% 
+    layout(margin = list(t = 80, b = 80, l = 80, r = 80))
 ```
 
 ### 1.4. Tests estadísticos
 
-```{r}
+```{r warning=FALSE}
 cor_income_diversity <- cor.test(data$Income, data$Product_Diversity, method = "spearman")
 cat("Correlación de Spearman (Income vs Product_Diversity):\n")
 cat("  ρ =", round(cor_income_diversity$estimate, 4), "\n")
@@ -214,15 +238,18 @@ library(dunn.test)
 dunn_diversity <- dunn.test(data$Product_Diversity, data$Income_Group, method = "bonferroni")
 ```
 
-**Interpretación**: La correlación de Spearman mide la asociación monotónica entre ingresos y diversidad. El test de Kruskal-Wallis evalúa si los cuatro grupos de ingresos presentan niveles de diversidad significativamente distintos. Las comparaciones de Dunn identifican qué pares concretos de grupos difieren entre sí.
+**Interpretación**: La correlación de Spearman mide la asociación monotónica entre ingresos y diversidad.
+El test de Kruskal-Wallis evalúa si los cuatro grupos de ingresos presentan niveles de diversidad significativamente distintos.
+Las comparaciones de Dunn identifican qué pares concretos de grupos difieren entre sí.
 
 ## Análisis 2: Curva de diversificación — ¿Existe un punto de saturación?
 
-Un aspecto interesante es si la diversificación crece de forma lineal con los ingresos o si existe un **punto de saturación** a partir del cual añadir más renta no supone comprar en más categorías. Este patrón tendría implicaciones directas para la política comercial: si la diversificación se estabiliza a partir de cierto umbral, las estrategias de *cross-selling* deberían focalizarse en los clientes que aún no han alcanzado dicho umbral.
+Un aspecto interesante es si la diversificación crece de forma lineal con los ingresos o si existe un **punto de saturación** a partir del cual añadir más renta no supone comprar en más categorías.
+Este patrón tendría implicaciones directas para la política comercial: si la diversificación se estabiliza a partir de cierto umbral, las estrategias de *cross-selling* deberían focalizarse en los clientes que aún no han alcanzado dicho umbral.
 
 ### 2.1. Curva suavizada (LOESS)
 
-```{r fig.width=10, fig.height=5}
+```{r fig.width=10, fig.height=5, warning=FALSE}
 x_max <- sort(data$Income, decreasing = TRUE)[2]
 
 ggplot(data, aes(x = Income, y = Product_Diversity)) +
@@ -260,33 +287,39 @@ div_decil <- data %>%
         .groups = "drop"
     )
 
-ggplot(div_decil, aes(x = Income_Decile, y = diversidad_media)) +
+p_div_decil <- ggplot(div_decil, aes(x = Income_Decile, y = diversidad_media,
+                                     text = paste0("Decil: ", Income_Decile,
+                                                   "<br>Diversidad media: ", round(diversidad_media, 1)))) +
     geom_line(color = "#1B4965", linewidth = 1.2) +
     geom_point(aes(size = n), color = "#1B4965", alpha = 0.8) +
     geom_text(aes(label = round(diversidad_media, 1)),
-        vjust = -1.2, size = 3.8, fontface = "bold", color = "#1B4965"
+        vjust = -1.2, size = 3.8, fontface = "bold", color = "#1B4965", show.legend = FALSE
     ) +
     scale_x_continuous(breaks = 1:10) +
     scale_y_continuous(limits = c(0, 6.5), breaks = 0:6) +
     scale_size_continuous(range = c(3, 6), guide = "none") +
     labs(
-        title = "Diversidad media por decil de ingresos",
+        title = "Diversidad media por decil de ingresos (interactivo)",
         subtitle = "¿A partir de qué decil la curva se aplana?",
         x = "Decil de ingresos (1 = más bajo, 10 = más alto)",
         y = "Nº medio de categorías compradas"
     ) +
     theme_minimal(base_size = 13) +
     theme(plot.title = element_text(face = "bold"))
+
+ggplotly(p_div_decil, tooltip = "text") %>% 
+    layout(margin = list(t = 80, b = 80, l = 80, r = 80))
 ```
 
 ```{r}
-cat("Diversidad media y % con 6 categorías por decil:\n\n")
 print(div_decil %>% select(Income_Decile, income_medio, diversidad_media, pct_6_cat), n = 10)
 ```
 
 ## Análisis 3: Tasa de activación por categoría — ¿Qué se «enciende» primero?
 
-Más allá de saber *cuántas* categorías se compran, resulta esencial conocer *cuáles* se activan primero. Definimos la **tasa de activación** como la proporción de clientes de cada decil que ha gastado al menos 1 € en una categoría concreta. Este análisis revela la **jerarquía de necesidades** del consumidor.
+Más allá de saber *cuántas* categorías se compran, resulta esencial conocer *cuáles* se activan primero.
+Definimos la **tasa de activación** como la proporción de clientes de cada decil que ha gastado al menos 1 € en una categoría concreta.
+Este análisis revela la **jerarquía de necesidades** del consumidor.
 
 ### 3.1. Curvas de activación por categoría
 
@@ -304,7 +337,10 @@ activacion <- data %>%
     ) %>%
     pivot_longer(-Income_Decile, names_to = "Categoria", values_to = "Tasa_Activacion")
 
-ggplot(activacion, aes(x = Income_Decile, y = Tasa_Activacion, color = Categoria)) +
+p_act <- ggplot(activacion, aes(x = Income_Decile, y = Tasa_Activacion, color = Categoria,
+                                text = paste0("Categoría: ", Categoria,
+                                              "<br>Decil: ", Income_Decile,
+                                              "<br>Activación: ", percent(Tasa_Activacion, accuracy = 0.1)))) +
     geom_line(linewidth = 1.1) +
     geom_point(size = 2.5) +
     scale_color_manual(values = palette_products) +
@@ -312,7 +348,7 @@ ggplot(activacion, aes(x = Income_Decile, y = Tasa_Activacion, color = Categoria
     scale_y_continuous(labels = percent_format(), limits = c(0, 1.05)) +
     labs(
         title = "Tasa de activación por categoría según decil de ingresos",
-        subtitle = "% de clientes que gastan al menos 1 € en cada categoría",
+        subtitle = "% de clientes que gastan al menos 1 € en cada categoría (interactivo)",
         x = "Decil de ingresos (1 = más bajo, 10 = más alto)",
         y = "% de clientes que compran en la categoría",
         color = "Categoría"
@@ -322,6 +358,9 @@ ggplot(activacion, aes(x = Income_Decile, y = Tasa_Activacion, color = Categoria
         plot.title = element_text(face = "bold"),
         legend.position = "right"
     )
+
+ggplotly(p_act, tooltip = "text") %>% 
+    layout(margin = list(t = 80, b = 80, l = 80, r = 80))
 ```
 
 ### 3.2. Orden de activación: ¿cuál es la primera y la última categoría?
@@ -354,11 +393,13 @@ activacion_extremos <- activacion %>%
 activacion_extremos
 ```
 
-**Interpretación**: Las categorías con mayor incremento entre el decil 1 y el decil 10 son las más sensibles al nivel de ingresos. Aquellas con tasa de activación alta incluso en el decil más bajo representan necesidades más «básicas» o universales del catálogo.
+**Interpretación**: Las categorías con mayor incremento entre el decil 1 y el decil 10 son las más sensibles al nivel de ingresos.
+Aquellas con tasa de activación alta incluso en el decil más bajo representan necesidades más «básicas» o universales del catálogo.
 
 ## Análisis 4: Entropía de Shannon — ¿Gasto equitativo o concentrado?
 
-La variable `Product_Diversity` mide si un cliente compra en una categoría (sí/no), pero no captura *cómo se distribuye* el gasto entre categorías. Para ello empleamos la **entropía de Shannon normalizada** (rango 0–1):
+La variable `Product_Diversity` mide si un cliente compra en una categoría (sí/no), pero no captura *cómo se distribuye* el gasto entre categorías.
+Para ello empleamos la **entropía de Shannon normalizada** (rango 0–1):
 
 -   **Entropía = 0**: el cliente gasta todo en una única categoría (máxima concentración).
 -   **Entropía = 1**: el gasto se reparte equitativamente entre las 6 categorías (máxima homogeneidad).
@@ -411,7 +452,7 @@ ggplot(
 
 ### 4.3. Test estadístico: entropía por grupo de ingresos
 
-```{r}
+```{r warning=FALSE}
 cor_income_entropy <- cor.test(
     data$Income[data$Total_Spending > 0],
     data$Shannon_Entropy[data$Total_Spending > 0],
@@ -458,7 +499,8 @@ ggplot(entropy_decil, aes(x = Income_Decile, y = entropy_media)) +
 
 ## Análisis 5: ¿Más ingresos implican más compras?
 
-Más allá de la diversidad (en qué categorías se compra), la **cantidad total de compras** es otro indicador relevante de la intensidad de la relación del cliente con la empresa. Analizamos brevemente si la frecuencia de compra también crece con los ingresos.
+Más allá de la diversidad (en qué categorías se compra), la **cantidad total de compras** es otro indicador relevante de la intensidad de la relación del cliente con la empresa.
+Analizamos brevemente si la frecuencia de compra también crece con los ingresos.
 
 ### 5.1. Exploración descriptiva
 
@@ -497,7 +539,7 @@ ggplot(data, aes(x = Income_Group, y = Total_Purchases, fill = Income_Group)) +
 
 ### 5.3. Test estadístico
 
-```{r}
+```{r warning=FALSE}
 cor_income_purchases <- cor.test(data$Income, data$Total_Purchases, method = "spearman")
 cat("Correlación de Spearman (Income vs Total_Purchases):\n")
 cat("  ρ =", round(cor_income_purchases$estimate, 4), "\n")
@@ -511,7 +553,7 @@ kruskal_purchases
 
 En lugar de presentar una matriz de correlaciones completa (ya disponible en el notebook de la pregunta grupal 1), sintetizamos solo las **correlaciones relevantes** para nuestra pregunta: la relación entre los ingresos y las tres métricas centrales de este notebook.
 
-```{r}
+```{r warning=FALSE}
 metricas <- c("Product_Diversity", "Shannon_Entropy", "Total_Purchases")
 nombres_metricas <- c("Diversidad (nº categorías)", "Entropía de Shannon", "Cantidad de compras")
 
@@ -543,26 +585,36 @@ for (i in seq_along(metricas)) {
 tabla_cor
 ```
 
-```{r fig.width=8, fig.height=4}
-ggplot(tabla_cor, aes(x = reorder(Metrica, abs(rho)), y = rho)) +
+```{r fig.width=8, fig.height=4, warning=FALSE}
+limit_inf <- min(tabla_cor$rho) * 1.3
+limit_sup <- max(tabla_cor$rho) * 1.3
+
+p_cor <- ggplot(tabla_cor, aes(x = reorder(Metrica, abs(rho)), y = rho,
+                                 text = paste0("Métrica: ", Metrica,
+                                               "<br>Spearman (ρ): ", rho))) +
     geom_col(fill = "#1B4965", alpha = 0.9, width = 0.5) +
     geom_text(aes(label = paste0("ρ = ", rho)),
-        hjust = ifelse(tabla_cor$rho > 0, -0.2, 1.2), size = 4.5, fontface = "bold"
+        hjust = ifelse(tabla_cor$rho >= 0, -0.2, 1.2), 
+        size = 4, fontface = "bold"
     ) +
     coord_flip() +
-    scale_y_continuous(limits = c(-0.1, max(tabla_cor$rho) * 1.3)) +
+    scale_y_continuous(limits = c(limit_inf, limit_sup)) + 
     labs(
-        title = "Correlación de Spearman: Ingresos vs. métricas de diversidad y cantidad",
-        subtitle = "Las tres métricas muestran asociación positiva significativa con los ingresos",
+        title = "Correlación de Spearman: Ingresos vs. métricas",
+        subtitle = "Asociación entre ingresos y métricas de consumo",
         x = NULL, y = "Coeficiente de Spearman (ρ)"
     ) +
     theme_minimal(base_size = 13) +
     theme(plot.title = element_text(face = "bold"))
+
+ggplotly(p_cor, tooltip = "text") %>% 
+    layout(margin = list(t = 80, b = 80, l = 80, r = 80))
 ```
 
 ## Análisis 7 (Pregunta extra): ¿Qué predice la diversidad de la cesta?
 
-Para determinar qué factores socioeconómicos tienen mayor peso en la diversificación del gasto, construimos un **árbol de decisión** que predice `Product_Diversity` a partir de variables de perfil. A diferencia de otros modelos del proyecto que predicen gasto total o segmento de gasto, este modelo se centra específicamente en la **amplitud de la cesta**.
+Para determinar qué factores socioeconómicos tienen mayor peso en la diversificación del gasto, construimos un **árbol de decisión** que predice `Product_Diversity` a partir de variables de perfil.
+A diferencia de otros modelos del proyecto que predicen gasto total o segmento de gasto, este modelo se centra específicamente en la **amplitud de la cesta**.
 
 ### 7.1. Entrenamiento del modelo
 
@@ -640,23 +692,25 @@ cat("Error relativo (RMSE / media):", round(rmse / mean(data_modelo$Product_Dive
 
 Tras analizar la diversidad de la cesta de compra desde múltiples perspectivas —amplitud (nº de categorías), homogeneidad (entropía de Shannon), intensidad (nº de compras), curvas de saturación y modelado predictivo—, extraemos las siguientes conclusiones:
 
-**1. Los clientes con mayores ingresos diversifican significativamente más su cesta.**
-La correlación de Spearman entre `Income` y `Product_Diversity` es positiva y significativa. Los clientes del cuartil superior presentan una diversidad media próxima al máximo (6 categorías), mientras que los del cuartil inferior concentran su gasto en menos categorías. El test de Kruskal-Wallis y las comparaciones de Dunn confirman diferencias significativas entre todos los pares de grupos.
+**1. Los clientes con mayores ingresos diversifican significativamente más su cesta.** La correlación de Spearman entre `Income` y `Product_Diversity` es positiva y significativa.
+Los clientes del cuartil superior presentan una diversidad media próxima al máximo (6 categorías), mientras que los del cuartil inferior concentran su gasto en menos categorías.
+El test de Kruskal-Wallis y las comparaciones de Dunn confirman diferencias significativas entre todos los pares de grupos.
 
-**2. Existe un efecto de saturación en la diversificación.**
-La curva LOESS y el análisis por deciles revelan que la diversificación crece rápidamente en los primeros deciles de ingreso, pero se estabiliza a partir del decil 6–7. Esto indica que, a partir de cierto umbral de renta, prácticamente todos los clientes ya compran en las 6 categorías y el margen para aumentar la variedad se agota.
+**2. Existe un efecto de saturación en la diversificación.** La curva LOESS y el análisis por deciles revelan que la diversificación crece rápidamente en los primeros deciles de ingreso, pero se estabiliza a partir del decil 6–7.
+Esto indica que, a partir de cierto umbral de renta, prácticamente todos los clientes ya compran en las 6 categorías y el margen para aumentar la variedad se agota.
 
-**3. Las categorías siguen un orden de activación jerárquico.**
-No todas las categorías se «encienden» al mismo ritmo. Algunas (como vino y carne) presentan tasas de activación altas incluso en los deciles de ingreso más bajos, mientras que otras (como fruta, dulces, pescado y oro) se activan progresivamente con los ingresos. Esto sugiere una estructura de preferencias donde ciertas categorías actúan como «primera compra» y otras como compras de expansión.
+**3. Las categorías siguen un orden de activación jerárquico.** No todas las categorías se «encienden» al mismo ritmo.
+Algunas (como vino y carne) presentan tasas de activación altas incluso en los deciles de ingreso más bajos, mientras que otras (como fruta, dulces, pescado y oro) se activan progresivamente con los ingresos.
+Esto sugiere una estructura de preferencias donde ciertas categorías actúan como «primera compra» y otras como compras de expansión.
 
-**4. Los clientes de mayor renta no solo compran en más categorías, sino que distribuyen su gasto de forma más equitativa.**
-La entropía de Shannon crece con los ingresos, lo que indica que los clientes de alto ingreso no solo amplían el número de categorías, sino que reparten su presupuesto de forma más homogénea. En contraste, los clientes de menor renta tienden a concentrar su gasto en una o dos categorías dominantes.
+**4. Los clientes de mayor renta no solo compran en más categorías, sino que distribuyen su gasto de forma más equitativa.** La entropía de Shannon crece con los ingresos, lo que indica que los clientes de alto ingreso no solo amplían el número de categorías, sino que reparten su presupuesto de forma más homogénea.
+En contraste, los clientes de menor renta tienden a concentrar su gasto en una o dos categorías dominantes.
 
-**5. El número total de compras también crece con los ingresos.**
-La correlación entre ingresos y `Total_Purchases` es positiva y significativa. Los clientes de mayor poder adquisitivo no solo diversifican más, sino que también compran con mayor frecuencia, lo que amplifica su valor como clientes.
+**5. El número total de compras también crece con los ingresos.** La correlación entre ingresos y `Total_Purchases` es positiva y significativa.
+Los clientes de mayor poder adquisitivo no solo diversifican más, sino que también compran con mayor frecuencia, lo que amplifica su valor como clientes.
 
-**6. (Pregunta extra) Los ingresos son el factor más determinante de la diversidad.**
-El árbol de decisión confirma que `Income` es la variable de mayor importancia para predecir cuántas categorías compra un cliente, por encima de la edad, la estructura familiar o el nivel educativo. La estructura del árbol revela perfiles accionables: los clientes con ingresos por debajo de cierto umbral y con hijos presentan la menor diversidad, mientras que los de ingresos altos diversifican independientemente de otras variables.
+**6. (Pregunta extra) Los ingresos son el factor más determinante de la diversidad.** El árbol de decisión confirma que `Income` es la variable de mayor importancia para predecir cuántas categorías compra un cliente, por encima de la edad, la estructura familiar o el nivel educativo.
+La estructura del árbol revela perfiles accionables: los clientes con ingresos por debajo de cierto umbral y con hijos presentan la menor diversidad, mientras que los de ingresos altos diversifican independientemente de otras variables.
 
 ### Implicaciones empresariales
 
@@ -665,4 +719,6 @@ Desde una perspectiva de *Customer Analytics*, estos resultados sugieren estrate
 -   **Cross-selling progresivo**: para clientes de ingresos medios que aún no compran en todas las categorías, las campañas deberían promover las categorías que se activan más tarde en la jerarquía (fruta, pescado, oro). Ofrecer descuentos de primer compra en estas categorías podría acelerar la diversificación.
 -   **Equilibrio de cesta en gama alta**: los clientes de ingresos altos ya compran en todas las categorías, pero la entropía indica que aún pueden existir categorías infrarepresentadas en su cesta. Las recomendaciones personalizadas deberían orientarse a equilibrar su gasto, no a añadir categorías.
 -   **Focalización en gama baja**: los clientes de menor renta concentran su gasto en pocas categorías. Las estrategias para este segmento deberían priorizar la **retención y el ticket** dentro de las categorías que ya consumen, en lugar de intentar diversificar su cesta.
--   **Umbral de saturación como criterio de segmentación**: el punto de inflexión de la curva de diversificación (~decil 6–7) puede servir como umbral para diferenciar segmentos con potencial de crecimiento en variedad frente a segmentos ya saturados.
+-   **Umbral de saturación como criterio de segmentación**: el punto de inflexión de la curva de diversificación (\~decil 6–7) puede servir como umbral para diferenciar segmentos con potencial de crecimiento en variedad frente a segmentos ya saturados.
+
+## Referencias
