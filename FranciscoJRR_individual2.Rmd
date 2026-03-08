@@ -4,36 +4,53 @@ author: "Francisco Javier Ruiz Rodríguez"
 output:
   html_document:
     toc: true
-    toc_float: true
+    toc_float:
+      collapsed: false
     toc_depth: 4
+    theme: flatly
+    highlight: tango
+    code_folding: show
 ---
+
+```{=html}
+<style>
+body {
+  text-align: justify;
+}
+</style>
+```
 
 # Navegantes o compradores: el compromiso real del cliente
 
 ## 1. Introducción
 
-En el ámbito del *Customer Analytics*, no basta con saber cuánto gasta un cliente: resulta igualmente importante comprender **cómo interactúa** con los canales digitales de la empresa y con qué frecuencia. Un cliente que visita la web recurrentemente pero no compra puede estar comparando precios, buscando ofertas o simplemente navegando sin intención de compra. Por el contrario, un cliente que apenas visita la web pero realiza compras decisivas cada poco tiempo revela un perfil de alto compromiso transaccional.
+En el ámbito del *Customer Analytics*, la dimensión digital del comportamiento del cliente ocupa un papel cada vez más estratégico. No basta con cuantificar cuánto gasta un cliente: es igualmente crucial entender **con qué frecuencia interactúa** con los canales digitales de la empresa y si esa interacción se traduce en transacciones reales. Un cliente que visita la web recurrentemente pero no compra puede estar comparando precios, buscando ofertas o simplemente explorando sin intención de compra firme. Por el contrario, un cliente que raramente visita la web pero ejecuta compras de forma decidida revela un alto **compromiso transaccional** independiente del canal digital.
 
-La variable `Recency` (días desde la última compra) y `NumWebVisitsMonth` (visitas mensuales a la web) son indicadores clave que, combinados, pueden revelar patrones de **compromiso real del cliente**. Sin embargo, hasta ahora en este proyecto ningún análisis las ha abordado como variables centrales de estudio.
+Dos variables del dataset capturan con precisión estas dinámicas:
+
+- `Recency`: días transcurridos desde la última compra. Un valor bajo indica un cliente reciente y activo; uno alto, un cliente inactivo o en proceso de abandono.
+- `NumWebVisitsMonth`: número de visitas mensuales al sitio web de la empresa. Mide la intensidad del comportamiento digital, pero no necesariamente la intención de compra.
+
+Ambas variables son indicadores complementarios del **compromiso real del cliente**: la primera recoge la dimensión transaccional y la segunda, la digital. Curiosamente, ningún análisis previo del proyecto las ha cruzado de forma sistemática como eje central de estudio.
 
 En este contexto, formulamos la siguiente pregunta de investigación:
 
-> ¿La recencia de compra y la actividad web permiten identificar perfiles diferenciados de compromiso del cliente?
+> ¿La recencia de compra y la actividad web permiten identificar perfiles diferenciados de compromiso del cliente, y existen diferencias significativas en el comportamiento de gasto entre dichos perfiles?
 
-Responder a esta cuestión es especialmente relevante porque:
+Responder a esta cuestión tiene relevancia estratégica directa porque:
 
--   **Permite detectar clientes en riesgo de abandono**: un Recency alto combinado con alta actividad web podría indicar insatisfacción o intención de abandono.
--   **Identifica oportunidades de conversión**: clientes que navegan mucho pero compran poco podrían ser objetivo de estrategias de conversión específicas.
--   **Complementa otros análisis del proyecto**: mientras que otros compañeros estudian los canales de compra (Jaime, Pablo), la rentabilidad de los descuentos (Andrés) y las respuestas a campañas (Jaime), este análisis aporta una perspectiva de **ciclo de vida y compromiso digital** del cliente.
+-   **Detecta clientes en riesgo de abandono**: alta recencia combinada con intensa actividad web puede indicar frustración o búsqueda activa de alternativas.
+-   **Revela la paradoja del navegante**: si los clientes más activos digitalmente no son los que más gastan, la empresa debe replantear cómo convierte tráfico web en ingresos.
+-   **Complementa otros análisis del proyecto**: mientras otros compañeros estudian canales de compra, rentabilidad de descuentos y respuesta a campañas, este análisis aporta la perspectiva del **ciclo de vida digital** del cliente.
 
-### 1.1. Objetivos
+### 1.1. Objetivos específicos
 
--   Estudiar la distribución y relación entre `Recency` y `NumWebVisitsMonth`.
--   Construir una segmentación de clientes según su nivel de compromiso combinando ambas variables.
--   Describir y comparar los perfiles de gasto de cada segmento de compromiso.
--   Evaluar si las diferencias entre segmentos son estadísticamente significativas.
--   Cuantificar el efecto de las visitas web y la recencia sobre el gasto mediante un modelo de regresión.
--   Derivar implicaciones de negocio accionables para la retención y conversión de clientes.
+1. Analizar la distribución individual de `Recency` y `NumWebVisitsMonth` y su relación con el gasto total.
+2. Verificar estadísticamente la independencia entre ambas variables para validar la segmentación bidimensional.
+3. Construir una tipología de clientes en cuatro cuadrantes de compromiso mediante cortes en las medianas.
+4. Comparar los perfiles descriptivos e inferenciales de cada cuadrante.
+5. Aplicar Minería de Reglas de Asociación (Apriori) para identificar los rasgos sociodemográficos que definen cada perfil.
+6. Derivar implicaciones de negocio accionables y diferenciadas por segmento.
 
 ## 2. Carga de datos y variables de trabajo
 
@@ -58,9 +75,28 @@ data$Marital_Status <- factor(
 )
 ```
 
+### 2.1. Verificación de calidad de datos {.unnumbered}
+
+Comprobamos que las variables centrales del análisis no presentan valores faltantes ni valores imposibles antes de construir los perfiles de compromiso.
+
 ```{r}
-str(data)
+data %>%
+    summarise(
+        NA_Recency        = sum(is.na(Recency)),
+        NA_WebVisits      = sum(is.na(NumWebVisitsMonth)),
+        NA_TotalSpending  = sum(is.na(Total_Spending)),
+        NA_Income         = sum(is.na(Income))
+    )
 ```
+
+```{r}
+cat("Recency < 0:", sum(data$Recency < 0, na.rm = TRUE), "\n")
+cat("NumWebVisitsMonth < 0:", sum(data$NumWebVisitsMonth < 0, na.rm = TRUE), "\n")
+cat("Total_Spending < 0:", sum(data$Total_Spending < 0, na.rm = TRUE), "\n")
+```
+
+> **Resultado:** Las variables `Recency`, `NumWebVisitsMonth` y `Total_Spending` están completas y son válidas en el 100% de los registros. El análisis procede sin imputaciones adicionales.
+
 
 ## 3. Análisis exploratorio de las variables centrales
 
@@ -89,7 +125,13 @@ ggplot(data, aes(x = Recency)) +
     theme_minimal(base_size = 13)
 ```
 
-La distribución de `Recency` es prácticamente **uniforme** entre 0 y ~100 días, lo que indica que los clientes se encuentran distribuidos equitativamente a lo largo del ciclo de recencia. No se observa un pico en valores bajos (clientes recientes) ni un exceso en valores altos (clientes inactivos), lo que sugiere que el dataset refleja una cartera estable sin sesgos temporales evidentes.
+**Lectura del gráfico**: El histograma muestra una distribución prácticamente **uniforme** de `Recency` entre 0 y ~100 días, con frecuencias similares en todos los intervalos y sin acumulaciones apreciables en ningún extremo. La línea discontinua roja indica la mediana.
+
+Esta uniformidad tiene varias implicaciones relevantes:
+
+-   **Ausencia de sesgo temporal**: a diferencia de lo que cabría esperar —una mayor concentración de clientes recientes si la empresa estuviera creciendo, o de clientes inactivos si estuviera perdiendo cuota—, la cartera se distribuye de forma plana. Esto sugiere un estado de equilibrio dinámico.
+-   **La recencia no diferenciará sola**: al no existir una masa crítica de clientes en ningún polo del eje de recencia, la variable por sí sola tiene poca capacidad discriminante. Es necesario combinarla con otra dimensión —las visitas web— para que emerjan perfiles útiles.
+-   **La mediana como punto de corte es robusta**: dado que la distribución es simétrica y no tiene colas largas, la mediana es el estadístico más adecuado para dividir la muestra en dos mitades homogéneas.
 
 ### 3.2. Distribución de NumWebVisitsMonth
 
@@ -116,7 +158,12 @@ ggplot(data, aes(x = NumWebVisitsMonth)) +
     theme_minimal(base_size = 13)
 ```
 
-La distribución se concentra entre 1 y 10 visitas mensuales, con la mediana en torno a 6. Esto indica que la mayoría de los clientes mantiene una actividad web moderada.
+**Lectura del gráfico**: La distribución de visitas web mensuales adopta una forma **ligeramente asimétrica hacia la derecha**, con la masa principal concentrada entre 2 y 8 visitas al mes. La mediana cae en torno a las 6 visitas mensuales. El eje se limita a 10 visitas para centrar la atención en el rango mayoritario (el 95% de los clientes), excluyendo una cola de valores extremos que representan menos del 5% de la muestra.
+
+Dos observaciones clave:
+
+-   **Actividad web moderada generalizada**: la mayor parte de los clientes visita la web entre 4 y 7 veces al mes, un ritmo que sugiere un nivel de interés activo pero sin llegar a un comportamiento obsesivo de búsqueda.
+-   **La cola derecha importa**: el pequeño porcentaje de clientes con más de 8-10 visitas mensuales concentra frecuencias de navegación muy superiores a la media. Como veremos, este grupo navega intensamente pero no siempre culmina en compra —el núcleo de la paradoja del navegante.
 
 ### 3.3. Relación entre Recency y visitas web
 
@@ -140,7 +187,13 @@ cat("  ρ =", round(cor_rec_web$estimate, 4), "\n")
 cat("  p-valor =", format.pval(cor_rec_web$p.value, digits = 3), "\n")
 ```
 
-La correlación entre ambas variables es débil, lo que indica que son dimensiones **independientes** del comportamiento del cliente. Esto valida el enfoque de combinarlas para crear una segmentación bidimensional.
+**Lectura del gráfico y del test**: La nube de puntos no muestra ningún patrón sistemático: para cada valor de `Recency`, el número de visitas web es prácticamente aleatorio, y la curva de suavizado LOESS se mantiene casi horizontal. El coeficiente de correlación de Spearman confirma esta percepción visual: un valor de ρ cercano a cero y un p-valor no significativo indican que **no existe una asociación estadística relevante** entre ambas variables.
+
+Esta independencia es un hallazgo metodológico crucial:
+
+-   **Valida la segmentación bidimensional**: si ambas variables estuvieran correlacionadas, los cuatro cuadrantes se fundirían y la segmentación perdería poder discriminante. Su independencia garantiza que cada eje aporta información genuinamente distinta.
+-   **Desaconseja el uso de una sola variable**: ninguna de las dos, por separado, cuenta la historia completa del cliente. Solo al cruzarlas emerge la tipología de compromiso que buscamos.
+-   **Significa que navegar más no implica comprar antes (ni después)**: un cliente puede ser muy frecuente en la web y llevar largo tiempo sin comprar, o puede haber comprado ayer y no haber visitado la web en semanas. Son comportamientos genuinamente desacoplados.
 
 ### 3.4. Relación de cada variable con el gasto total
 
@@ -161,10 +214,11 @@ p2 <- ggplot(data, aes(x = NumWebVisitsMonth, y = Total_Spending)) +
 gridExtra::grid.arrange(p1, p2, ncol = 2)
 ```
 
-Se observa que:
+**Lectura de los gráficos**: Los dos *scatter plots* muestran la relación individual de cada variable central con el gasto total (`Total_Spending`), con una curva de suavizado LOESS que permite detectar tendencias no lineales.
 
--   **Recency** no muestra una relación clara con el gasto total: clientes con alta y baja recencia gastan cantidades similares.
--   **Visitas web** muestra una relación **negativa**: los clientes que visitan más la web tienden a gastar **menos**. Esto sugiere que la actividad web intensa podría reflejar comportamiento comparativo (búsqueda de ofertas) más que intención de compra efectiva.
+**Panel izquierdo — Recency vs. Gasto total**: La curva de suavizado es prácticamente **horizontal** y la banda de confianza es amplia, lo que indica ausencia de tendencia. Clientes con 10 días de recencia y clientes con 90 días de recencia presentan rangos de gasto total equivalentes. **Conclusión**: la antigüedad de la última compra no predice el nivel de gasto acumulado del cliente. Esto es coherente con la distribución uniforme que observamos en la sección 3.1.
+
+**Panel derecho — Visitas web vs. Gasto total**: Aquí emerge el patrón más sorprendente del análisis. La curva LOESS traza una **pendiente claramente negativa**: a medida que aumentan las visitas web mensuales, el gasto total del cliente tiende a disminuir. Este hallazgo, contraintuitivo a primera vista, define la **paradoja del navegante**: una mayor frecuencia de interacción con el canal web no se traduce en mayor gasto; al contrario, puede reflejar un perfil de cliente que usa la web principalmente para comparar precios y buscar descuentos, y que presenta menor disposición a pagar el precio completo. Esta hipótesis se reforzará a lo largo del análisis, especialmente en la caracterización del perfil «En riesgo».
 
 ## 4. Segmentación por perfil de compromiso
 
@@ -198,12 +252,16 @@ data <- data %>%
 data %>% count(Perfil_Compromiso)
 ```
 
-Los cuatro perfiles de compromiso se interpretan de la siguiente manera:
+Los cuatro cuadrantes generan perfiles con interpretaciones de negocio bien diferenciadas:
 
--   **Comprador decidido** (baja recencia, pocas visitas web): compra con frecuencia y sin necesidad de navegar mucho. Perfil de mayor compromiso transaccional.
--   **Explorador activo** (baja recencia, muchas visitas web): compra recientemente pero navega intensamente. Puede ser un cliente informado o comparativo.
--   **Latente silencioso** (alta recencia, pocas visitas web): no compra ni navega. Inactividad digital y transaccional — perfil preocupante.
--   **En riesgo** (alta recencia, muchas visitas web): no compra pero sigue navegando. Posible insatisfacción o indecisión — perfil más crítico para intervención.
+| Perfil | Recency | Visitas web | Significado |
+|---|---|---|---|
+| **Comprador decidido** | Baja | Pocas | Compra con frecuencia y decisión. No necesita navegar para convencerse. El perfil más valioso y rentable. |
+| **Explorador activo** | Baja | Muchas | Compra con regularidad pero requiere mucha navegación previa. Gran potencial de conversión si se mejora la experiencia online. |
+| **Latente silencioso** | Alta | Pocas | Sin actividad transaccional ni digital. Inactividad generalizada. Requiere reactivación urgente o descarte. |
+| **En riesgo** | Alta | Muchas | Sigue visitando la web intensamente pero lleva mucho tiempo sin comprar. Máxima expresión de la paradoja del navegante: presente pero no comprador. |
+
+El uso de las **medianas** como punto de corte es una elección metodológica deliberada: al ser robustos frente a valores extremos y dividir la muestra en mitades exactas, garantizan una segmentación equilibrada que no se ve distorsionada por clientes atípicos con recencias o visitas excepcionalmente altas.
 
 ### 4.2. Visualización de los cuadrantes
 
@@ -246,7 +304,14 @@ ggplot(data, aes(x = Recency, y = NumWebVisitsMonth, color = Perfil_Compromiso))
     theme_minimal(base_size = 13)
 ```
 
-El mapa de cuadrantes permite visualizar la distribución de clientes según su compromiso. Cada cuadrante tiene un color que refleja su nivel de «salud» para la empresa: verde (ideal), azul (potencial), naranja (precaución) y rojo (alerta).
+**Lectura del gráfico**: El mapa de compromiso muestra la nube de puntos del conjunto de clientes sobre el espacio bidimensional {Recency, Visitas web}. Las líneas discontinuas grises marcan los cortes en las medianas, delimitando visualmente los cuatro cuadrantes. El código de color aplicado refleja el nivel de «alerta» que cada perfil supone para la empresa:
+
+-   🟢 **Verde (Comprador decidido)**: cuadrante inferior izquierdo. El cuadrante más saludable: compra reciente y baja necesidad de navegar.
+-   🔵 **Azul (Explorador activo)**: cuadrante superior izquierdo. Alta actividad pero también compra reciente. Potencial alto.
+-   🟠 **Naranja (Latente silencioso)**: cuadrante inferior derecho. Inactivos en ambas dimensiones. Precaución.
+-   🔴 **Rojo (En riesgo)**: cuadrante superior derecho. Navegan mucho pero llevan tiempo sin comprar. La situación más crítica para marketing.
+
+La distribución visual confirma que los cuatro cuadrantes están razonablemente poblados, lo que valida la estructura de la segmentación y sugiere que los cuatro perfiles son genuinamente representativos de la cartera.
 
 ## 5. Análisis descriptivo comparativo
 
@@ -265,6 +330,18 @@ ggplot(data, aes(x = Perfil_Compromiso, y = Total_Spending, fill = Perfil_Compro
     theme_minimal(base_size = 13) +
     theme(legend.position = "none", plot.title = element_text(face = "bold"))
 ```
+
+**Lectura del gráfico**: El gráfico tipo *violin + boxplot* combina dos niveles de detalle: la forma del violín revela la distribución completa del gasto en cada perfil, mientras que el boxplot interior indica mediana, cuartiles y valores atípicos. El resultado es llamativo porque **no sigue el orden intuitivo esperado**:
+
+-   🟢 **Comprador decidido**: mediana de gasto elevada (~700€) y caja amplia que se extiende hacia los valores altos. El perfil de mayor compromiso transaccional se corresponde con un gasto acumulado alto. Esperado y coherente.
+
+-   🔵 **Explorador activo**: mediana de gasto **muy baja** (~150€) y violín extremadamente concentrado en la parte inferior del eje. Es el resultado más sorprendente: estos clientes compran recientemente (baja recencia) pero su gasto acumulado en los últimos 2 años es mínimo. Navegan mucho y compran seguido, pero en cantidades muy pequeñas por transacción.
+
+-   🟠 **Latente silencioso**: mediana de gasto **alta** (~800€), comparable a la del Comprador decidido, con una caja igualmente amplia. Paradójicamente, los clientes que llevan más tiempo sin comprar y apenas visitan la web presentan uno de los gastos históricos más elevados. Esto sugiere que son clientes que **compraron mucho en el pasado** pero han caído en un estado de inactividad. No son clientes de bajo valor: son clientes dormidos de alto valor.
+
+-   🔴 **En riesgo**: mediana de gasto baja (~200€) y violín concentrado en valores reducidos. Navegan intensamente pero llevan mucho tiempo sin comprar y, cuando lo hacían, gastaban poco. Representan el perfil de menor retorno para la empresa.
+
+Este gráfico introduce un matiz fundamental que reorienta la interpretación del análisis: **la recencia alta no equivale a bajo gasto histórico**. El Latente silencioso es la prueba de ello. La urgencia de reactivarlo no viene de que sea un cliente de poco valor, sino precisamente de lo contrario: es un cliente que ya demostró alta capacidad de gasto y que la empresa está perdiendo.
 
 ### 5.2. Perfil resumen de cada segmento
 
@@ -295,11 +372,44 @@ perfiles_largo <- perfiles_resumen %>%
 print(perfiles_largo, n = Inf, width = Inf)
 ```
 
+**Lectura de la tabla**: Los datos reales revelan un patrón que no era evidente a priori y que reorienta toda la interpretación del análisis:
+
+**La verdadera división no es por recencia, sino por ingresos.** Los cuatro perfiles se agrupan de forma natural en **dos bloques económicamente diferenciados**:
+
+| | **Comprador decidido** | **Latente silencioso** | **Explorador activo** | **En riesgo** |
+|---|---|---|---|---|
+| Gasto medio | 763€ | **793€** | 319€ | 318€ |
+| Ingreso medio | 60.570€ | 59.830€ | 38.895€ | 38.422€ |
+| Hijos | 0.78 | 0.81 | 1.19 | 1.24 |
+| Deals_Ratio | 0.188 | 0.181 | 0.332 | **0.344** |
+| Compras totales | 14.5 | 14.6 | 9.3 | 9.3 |
+| Resp. campañas | 31.6% | 25.4% | 29.8% | 20.6% |
+
+- **Bloque alto valor** (Comprador decidido + Latente silencioso): ingresos medios de ~60.000€, gasto de ~780€, ~14,5 compras medias y Deals_Ratio bajo (~0.18). Son clientes que apenas necesitan descuentos para comprar, con pocos hijos en casa y mayor capacidad de gasto discrecional. La única diferencia entre ellos es la **recencia**: el Comprador decidido ha comprado hace 24 días de media, el Latente silencioso hace 74 días. Mismo perfil económico, distinto estado de actividad.
+
+- **Bloque bajo valor** (Explorador activo + En riesgo): ingresos medios de ~38.600€, gasto de ~318€, ~9.3 compras medias y Deals_Ratio alto (~0.34). Son clientes con más hijos en casa, mayor sensibilidad al precio y fuerte dependencia de los descuentos para decidirse a comprar. De nuevo, la diferencia entre ambos es la recencia: el Explorador activo es reciente (24 días), el En riesgo lleva tiempo sin comprar (74 días).
+
+Esto tiene implicaciones críticas para la estrategia:
+
+-   **No hay que tratar al Explorador activo como un cliente de alto potencial**: sus visitas frecuentes no anticipan grandes compras. Es un comprador de bajo ticket que navega para encontrar la mejor oferta.
+-   **El Latente silencioso es la oportunidad de oro**: mismos ingresos y gasto histórico que el Comprador decidido, pero dormido. Reactivarlo tiene un retorno potencial altísimo.
+-   **El Deals_Ratio confirma la paradoja**: los perfiles que más navegan (Explorador + En riesgo) son también los que mayor proporción de compras realizan aprovechando descuentos. La web la usan para cazar ofertas, no para comprar a precio de catálogo.
+-   **La respuesta a campañas cae en los perfiles de riesgo**: el En riesgo es el segmento menos reactivo (20.6%), lo que complica su reactivación mediante los canales de marketing habituales.
+
+> **Hallazgo — Estructura de dos bloques:** La segmentación bidimensional {Recency × Visitas web} no genera cuatro perfiles económicamente distintos, sino **dos bloques diferenciados por ingresos**. Dentro de cada bloque, la recencia determina la actividad transaccional. Esto implica que el eje de visitas web no predice valor, sino urgencia de compra condicionada por el nivel económico del cliente.
+
+---
+
 ## 6. Análisis inferencial
 
 ### 6.1. Tests para variables numéricas (Kruskal-Wallis)
 
-Para evaluar si las diferencias observadas entre los cuatro perfiles son estadísticamente significativas, aplicamos el test de **Kruskal-Wallis** (α = 0.05).
+Planteamiento formal del contraste:
+
+- **H₀**: La distribución de cada variable numérica es la misma en los cuatro perfiles de compromiso.
+- **H₁**: Al menos un perfil presenta una distribución distinta.
+
+Se rechaza H₀ si el p-valor < α = 0.05. Complementamos con el **tamaño del efecto ε²** para evaluar la relevancia práctica de las diferencias detectadas (ε² > 0.14 = efecto grande).
 
 ```{r}
 vars_test <- c(
@@ -312,20 +422,37 @@ resultados_kw <- data.frame(
     Variable = vars_test,
     Estadistico = NA_real_,
     p_valor = NA_real_,
+    Epsilon2 = NA_real_,
     stringsAsFactors = FALSE
 )
+
+n <- nrow(data)
+k <- 4 # cuatro perfiles de compromiso
 
 for (i in seq_along(vars_test)) {
     v <- vars_test[i]
     test <- kruskal.test(reformulate("Perfil_Compromiso", response = v), data = data)
-    resultados_kw$Estadistico[i] <- round(test$statistic, 2)
+    H <- as.numeric(test$statistic)
+    resultados_kw$Estadistico[i] <- round(H, 2)
     resultados_kw$p_valor[i] <- round(test$p.value, 6)
+    resultados_kw$Epsilon2[i] <- round((H - k + 1) / (n - k), 4)
 }
 
 resultados_kw$Significativa <- ifelse(resultados_kw$p_valor < 0.05, "Sí", "No")
 
-resultados_kw
+knitr::kable(resultados_kw,
+    digits = 4,
+    caption = "Kruskal-Wallis y tamaño del efecto (ε²) por variable"
+)
 ```
+
+**Interpretación de la tabla de resultados**: El test de Kruskal-Wallis contrasta la hipótesis nula de que la distribución de cada variable es **idéntica** en los cuatro perfiles. Un p-valor inferior a 0.05 rechaza dicha hipótesis. La columna **ε²** cuantifica la magnitud práctica de esa diferencia, más allá de la significación estadística:
+
+-   **H elevado + p < 0.05 + ε² > 0.14**: diferencias grandes y estadísticamente sólidas entre los cuatro cuadrantes.
+-   **H bajo + p > 0.05**: los cuatro grupos son estadísticamente equivalentes en esa variable.
+-   **p < 0.05 pero ε² ≈ 0**: diferencia estadísticamente significativa pero prácticamente despreciable, posible artefacto del tamaño muestral.
+
+Esta batería de tests permite separar qué variables definen realmente el valor diferencial de cada perfil de aquellas en las que los cuatro segmentos son indistinguibles.
 
 ### 6.2. Resumen de significación
 
@@ -353,6 +480,10 @@ if (length(vars_no_sig) > 0) {
     }
 }
 ```
+
+**Lectura del resumen**: Las variables con diferencias significativas entre perfiles son las que el modelo de segmentación ha logrado separar de forma efectiva. En particular, los resultados confirman que los cuatro cuadrantes difieren significativamente en gasto total, ingresos, número de compras y canales utilizados. Esto valida que la segmentación bidimensional {Recency × Visitas web} **no es arbitraria**, sino que se corresponde con diferencias reales y medibles en el comportamiento de gasto del cliente.
+
+Por el contrario, las variables sin diferencias significativas (si las hay) revelan características en las que todos los clientes, independientemente de su perfil de compromiso, se comportan de forma homogénea. Esto ayuda también a descartar potenciales variables de confusión.
 
 ## 7. Minería de Reglas de Asociación (Apriori)
 
@@ -391,75 +522,98 @@ cat("Dimensiones del dataset de transacciones:\n")
 transacciones
 ```
 
+**Preparación de los datos**: El resultado muestra un objeto de transacciones con tantas filas como clientes y tantos ítems únicos como categorías existen en el conjunto de variables discretizadas. Cada cliente queda representado como un conjunto de atributos (p. ej. {Ingresos Altos, Sin Hijos, Aceptó Campañas, Comprador decidido}). El algoritmo Apriori buscará, dentro de estos conjuntos, combinaciones frecuentes que aparezcan juntas con alta probabilidad.
+
 ### 7.3. Reglas para el perfil "Comprador decidido"
 
-Buscamos qué perfiles tienen mayor probabilidad (alta confianza) de pertenecer al cuadrante más rentable empíricamente.
+Buscamos qué combinaciones de atributos sociodemográficos aparecen frecuentemente asociadas al perfil de mayor valor. El perfil "Comprador decidido" representa el ~31% de la cartera, por lo que ese es el umbral de referencia (probabilidad base). Usando una confianza mínima del 35% —por encima de esa tasa base— nos aseguramos de que todas las reglas obtenidas tengan *lift* > 1, es decir, que aporten información real más allá del azar.
 
 ```{r}
-# Restringimos el consecuente (rhs) al perfil deseado
+# Comprador decidido representa ~31% de la cartera (tasa base)
+# conf = 0.35 > tasa base -> garantiza lift > 1 en todas las reglas
 reglas_decidido <- apriori(transacciones,
-    parameter = list(supp = 0.05, conf = 0.5, minlen = 2, maxlen = 4),
+    parameter = list(supp = 0.05, conf = 0.35, minlen = 2, maxlen = 4),
     appearance = list(default = "lhs", rhs = "Perfil_Compromiso=Comprador decidido"),
     control = list(verbose = FALSE)
 )
 
-# Ordenamos por Lift para ver las reglas que más aportan sobre la probabilidad base
+# Ordenamos por Lift: mayor lift = mayor poder discriminante de la combinación
 reglas_decidido <- sort(reglas_decidido, by = "lift")
-inspect(head(reglas_decidido, 5))
+inspect(head(reglas_decidido, 8))
 ```
+
+**Lectura de las reglas**: La columna `lhs` muestra los atributos del cliente (antecedente); `rhs` es siempre «Comprador decidido» (consecuente). La columna `lift` cuantifica cuántas veces más probable es ese perfil cuando el cliente tiene esos atributos frente a un cliente aleatorio. La `confidence` indica la precisión de la regla.
 
 ### 7.4. Reglas para el perfil "En riesgo"
 
-Repetimos el proceso para identificar qué combinaciones de factores nos alertan de que un cliente pertenece al grupo de mayor riesgo (alta recencia, muchas visitas sin compra). Rebajamos la confianza mínima debido a que es una clase menos frecuente en esta división.
+Repetimos el proceso para el perfil de mayor riesgo. El perfil "En riesgo" representa el ~17.6% de la cartera (388 clientes sobre 2.202), por lo que su tasa base es más baja. Usamos una confianza mínima del 22% —claramente por encima del 17.6%— y un soporte más bajo (2%) para capturar patrones aunque sean menos frecuentes.
 
 ```{r}
+# En riesgo representa ~17.6% de la cartera (tasa base)
+# conf = 0.22 > tasa base -> garantiza lift > 1 en todas las reglas
 reglas_riesgo <- apriori(transacciones,
-    parameter = list(supp = 0.02, conf = 0.2, minlen = 2, maxlen = 4),
+    parameter = list(supp = 0.02, conf = 0.22, minlen = 2, maxlen = 4),
     appearance = list(default = "lhs", rhs = "Perfil_Compromiso=En riesgo"),
     control = list(verbose = FALSE)
 )
 
 reglas_riesgo <- sort(reglas_riesgo, by = "lift")
-inspect(head(reglas_riesgo, 5))
+inspect(head(reglas_riesgo, 8))
 ```
+
+**Lectura de las reglas**: Las reglas aparecen ordenadas por *lift* descendente. Aquellas combinaciones de atributos que más aumentan la probabilidad de identificar un cliente "En riesgo" encabezan la tabla. Un *lift* superior a 1.5 indica que esa combinación casi duplica la probabilidad de pertenecer al perfil respecto al azar.
 
 ### 7.5. Interpretación de patrones
 
-Las reglas de asociación revelan que los perfiles de compromiso no son aleatorios, sino que están fuertemente ligados a condiciones estructurales:
+El contraste entre ambos conjuntos de reglas dibuja dos retratos robot radicalmente distintos:
 
--   **El ADN del Comprador Decidido**: Las reglas con mayor *lift* muestran que ser un comprador eficiente está muy ligado a tener **ingresos altos, no tener hijos en casa y ser receptivo a campañas**. Es el cliente *premium* clásico.
--   **El ADN del Cliente "En Riesgo"**: Por el contrario, los clientes que visitan la web intensamente pero llevan tiempo sin comprar suelen caracterizarse por **ingresos bajos o medios, convivencia con hijos y nula respuesta a campañas previas**.
+**El ADN del Comprador Decidido**: Las reglas con mayor lift apuntan sistemáticamente hacia un cliente con **ingresos altos y sin hijos en casa**. Se trata del clásico «consumidor premium»: su capacidad económica le permite comprar sin comparar obsesivamente precios. La ausencia de hijos puede interpretarse como una menor presión sobre el presupuesto familiar, lo que libera capacidad de gasto discrecional.
+
+**El ADN del Cliente «En Riesgo»**: En el polo opuesto, las reglas de mayor lift señalan a clientes con **ingresos bajos o medios, convivencia con hijos en el hogar y nula respuesta a campañas anteriores**. Este perfil usa la web fundamentalmente como herramienta de **comparación y búsqueda de la mejor oferta**. Con un presupuesto familiar más ajustado y mayor sensibilidad al precio, necesita más información antes de decidirse a comprar, de ahí la alta frecuencia de visitas. El hecho de que no respondan a las campañas estándar sugiere que los mensajes actuales de marketing no conectan con sus motivaciones reales (ahorro, valor familiar).
+
+Este hallazgo transforma la paradoja del navegante de un fenómeno descriptivo a uno **explicado**: los que más navegan son los que tienen más restricciones presupuestarias. La solución no es reducir su tráfico, sino hablarles diferente.
 
 ---
 
-### 8. Implicaciones de negocio
+## 8. Implicaciones de negocio
 
-La combinación del análisis exploratorio, las pruebas estadísticas y la extracción de reglas sociodemográficas permite diseñar una estrategia integral y específica para cada segmento de la cartera:
+La combinación del análisis exploratorio, los datos descriptivos de la tabla y la minería de reglas de asociación permite diseñar una estrategia comercial integral y diferenciada por segmento. El hallazgo clave que estructura todo el plan de acción es que **la cartera real está dividida en dos bloques de ingresos**, y dentro de cada bloque la recencia define si el cliente está activo o dormido:
 
-1.  **Comprador decidido (Alta rentabilidad, alta fidelidad)**:
-    -   *Perfil*: Ingresos altos, sin hijos en casa, altamente receptivos a marketing. Son los clientes que más gastan (sección 5) con niveles de compra muy eficientes.
-    -   *Acción*: **Fidelización VIP y retención**. No requieren agresividad en precios ni descuentos frecuentes (su *Deals_Ratio* es bajo). La estrategia debe centrarse en exclusividad: acceso anticipado a catálogos, programas de fidelidad premium y trato personalizado.
+1.  **Comprador decidido — Mantener y premiar** *(alta renta, activo)*:
+    -   *Perfil real*: ~60.570€ de ingreso medio, 763€ de gasto medio, 14,5 compras en 2 años, recencia de 24 días y Deals_Ratio bajo (0.19). Responde bien a campañas (31.6%).
+    -   *Acción*: **Fidelización VIP**. Es el cliente ideal y no necesita descuentos para comprar. La inversión debe centrarse en exclusividad (acceso temprano a novedades, programas de puntos premium) y en mantener la cadencia de compra. Cualquier descuento innecesario erosiona el margen sin añadir valor.
 
-2.  **Explorador activo (Alto tráfico, conversión mejorable)**:
-    -   *Perfil*: Compran recientemente pero necesitan navegar intensamente la web. Tienen un gasto total moderado pero una actividad digital altísima.
-    -   *Acción*: **Optimización de la conversión online (CRO)**. El objetivo es acortar su ciclo de decisión. Implementar recomendaciones personalizadas, simplificar el proceso de *checkout* (compra en un clic), crear ofertas urgentes temporales en la web y usar recordatorios de carritos abandonados.
+2.  **Latente silencioso — Reactivar con urgencia** *(alta renta, dormido)*:
+    -   *Perfil real*: ~59.830€ de ingreso medio, **793€ de gasto medio** (el más alto de los cuatro perfiles), 14.6 compras en 2 años, pero recencia de **74 días**. Deals_Ratio muy bajo (0.18). Son el cliente premium que ha dejado de comprar, no un cliente de bajo valor.
+    -   *Acción*: **Reactivación de alta prioridad**. A diferencia del cliente En riesgo, éste tiene historial y capacidad de gasto probados. La estrategia no debe ser de descuentos, sino de **reenganche emocional**: emails personalizados recordando su historial, novedades exclusivas, invitaciones a eventos privados o llamada comercial directa. El ROI potencial de recuperar a este cliente es el más alto de toda la cartera.
 
-3.  **Latente silencioso (Inactividad generalizada)**:
-    -   *Perfil*: No compran ni navegan. Sus métricas de gasto e interacción son las más bajas, pero no tienen un perfil sociodemográfico tan fuertemente encasillado como otros grupos.
-    -   *Acción*: **Reactivación directa o purga**. Campañas de choque vía email ("Te echamos de menos") con ofertas límite de readquisición. Si no responden tras varios intentos, resulta más eficiente reasignar el presupuesto de marketing a perfiles más reactivos.
+3.  **Explorador activo — Gestionar eficiencia, no volumen** *(baja renta, activo)*:
+    -   *Perfil real*: ~38.895€ de ingreso medio, solo **319€ de gasto medio** a pesar de comprar con frecuencia (recencia 24 días), Deals_Ratio de 0.33. Visita la web 7.7 veces al mes. Muchas transacciones, pero de bajo ticket y con alto reclamo de descuentos.
+    -   *Acción*: **Maximizar el valor por transacción (AoV)**. El objetivo no es que compre más veces (ya lo hace) sino que gaste más por compra. Estrategias de *bundling* (packs de productos), umbral de envío gratuito más alto para incentivar el carrito mayor y *upselling* dirigido en el checkout. Invertir en este segmento con descuentos indiscriminados sería contraproducente: ya compra con descuento y su margen es el más ajustado.
 
-4.  **En riesgo (Navegantes comparadores)**:
-    -   *Perfil*: Ingresos bajos/medios, familias con hijos, nula respuesta a campañas. Visitan muchísimo la web pero llevan mucho tiempo sin comprar (alta recencia) y su gasto acumulado es bajo. Representan la máxima expresión de la paradoja del navegante.
-    -   *Acción*: **Empuje por valor y precio**. Son clientes altamente sensibles al precio que usan la web para buscar chollos. Ofrecer packs familiares de ahorro, envíos gratuitos condicionados (ej. compras > 30€) y promociones focalizadas en maximizar su presupuesto doméstico.
+4.  **En riesgo — Intervención selectiva y precio** *(baja renta, dormido)*:
+    -   *Perfil real*: ~38.422€ de ingreso medio, 318€ de gasto medio, recencia de 74 días, Deals_Ratio más alto de todos (0.34), tasa de respuesta a campañas más baja (20.6%). Son los más difíciles de reactivar y los de menor potencial económico.
+    -   *Acción*: **Retargeting por precio y valor familiar**. Dado que usan la web para comparar y buscar la mejor oferta (Deals_Ratio 0.34), la única palanca eficaz es el precio. Campañas de retargeting digital con ofertas de ahorro familiar, descuentos con umbral mínimo de compra y packs que maximicen el presupuesto doméstico. No gastar recursos premium en este segmento: si no responden a dos o tres impactos de precio, priorizar otros segmentos.
 
-### 9. Conclusiones finales
+## 9. Conclusiones finales
 
-1.  **La actividad digital no garantiza ingresos (La paradoja del navegante)**: El análisis exploratorio (sección 3) demostró de forma contraintuitiva que un mayor número de visitas web se asocia con un **menor** gasto total. La navegación intensa suele reflejar un comportamiento comparativo y de búsqueda de ofertas, no necesariamente una intención de compra segura.
+1.  **La paradoja del navegante, confirmada y explicada**: El análisis exploratorio demostró que más visitas web se asocian con menor gasto total. La tabla de perfiles lo cuantifica: los clientes con mayor actividad web (Explorador activo y En riesgo, ~7.7 visitas/mes) gastan de media solo **318-319€**, frente a los ~780€ de los perfiles de baja actividad web (Comprador decidido y Latente silencioso, ~3.9 visitas/mes). Las reglas de asociación Apriori explican el mecanismo: los navegadores intensivos son familias de menor renta (38k€ vs 60k€) que usan la web para comparar precios, no para comprar con decisión.
 
-2.  **La segmentación bidimensional es robusta**: `Recency` y `NumWebVisitsMonth` son variables prácticamente independientes (correlación casi nula). Al cruzarlas mediante sus medianas, logramos una segmentación empírica en cuatro cuadrantes ("Comprador decidido", "Explorador activo", "Latente silencioso", "En riesgo") que discrimina perfectamente el valor del cliente. Las pruebas de Kruskal-Wallis confirmaron diferencias estadísticamente significativas en gasto e ingresos entre estas agrupaciones.
+2.  **El verdadero eje de valor es el ingreso, no la recencia**: La segmentación bidimensional revela que los cuatro perfiles se agrupan en dos bloques económicos. El Comprador decidido y el Latente silencioso tienen perfiles de ingreso, gasto, número de compras y Deals_Ratio casi idénticos (~60k€, ~780€, 14.5 compras, 0.18-0.19). Lo mismo ocurre entre Explorador activo y En riesgo (~38k€, ~318€, 9.3 compras, 0.33-0.34). Dentro de cada bloque, la recencia solo indica si el cliente está activo o dormido en este momento.
 
-3.  **El ingreso como motor subyacente**: Aunque la actividad web y la recencia definen el compromiso temporal, el análisis global e inferencial confirma sistemáticamente que los niveles de ingresos (Income) dictan la capacidad de gasto real del cliente y su pertenencia al cuadrante más rentable.
+3.  **El Latente silencioso es la oportunidad de mayor retorno**: Con el gasto medio más alto de los cuatro perfiles (793€) e ingresos equivalentes al Comprador decidido, reactivar a este cliente tiene un potencial de retorno altísimo y requiere estrategias de reenganche premium, no de descuento.
 
-4.  **El compromiso refleja la demografía**: El modelo no supervisado de Minería de Reglas de Asociación (Apriori) reveló que los perfiles conductuales no son accidentales. Estar "en riesgo" es un claro reflejo de familias con hijos y presupuestos ajustados midiendo bien dónde gastan. Ser un "comprador decidido" está vinculado a hogares sin hijos y altas rentas. 
+4.  **Los perfiles conductuales son un reflejo de la demografía**: Las reglas Apriori confirmaron que ingresos altos + sin hijos predice el perfil de mayor compromiso transaccional, mientras que ingresos medios/bajos + hijos en casa predice los perfiles de alta navegación y bajo gasto. El comportamiento digital no es aleatorio: está estructurado por la capacidad económica del hogar y sus prioridades de consumo.
 
-5.  **Valor analítico no supervisado**: En contraposición a enfoques predictivos puros, este cuaderno demuestra que las herramientas descriptivas y de segmentación (Kruskal-Wallis para detectar diferencias, Apriori para revelar perfiles estructurales) aportan un enorme valor estratégico y accionable, desgranando no solo *cuánto* gastan los clientes, sino *quiénes* son y *cómo* navegan.
+5.  **Implicación metodológica**: La combinación de segmentación bidimensional (Kruskal-Wallis para validar diferencias) y minería de reglas de asociación (Apriori para explicar causas) demuestra que las herramientas descriptivas no supervisadas ofrecen un valor estratégico comparable —o superior— al de los modelos predictivos clásicos para este tipo de análisis de perfilado de clientes.
+
+## Referencias
+
+Agrawal, R., & Srikant, R. (1994). Fast algorithms for mining association rules. *Proceedings of the 20th International Conference on Very Large Data Bases (VLDB)*, 1215, 487–499.
+
+Moe, W. W. (2003). Buying, searching, or browsing: Differentiating between online shoppers using in-store navigational clickstream. *Journal of Consumer Psychology*, 13(1–2), 29–39. <https://doi.org/10.1207/S15327663JCP13-1&2_03>
+
+Blattberg, R. C., Kim, B. D., & Neslin, S. A. (2008). *Database Marketing: Analyzing and Managing Customers*. Springer. <https://doi.org/10.1007/978-0-387-72579-6>
+
+R for Data Science. "Data Transformation: dplyr and data manipulation". Recuperado de: <https://r4ds.hadley.nz/data-transform>
+

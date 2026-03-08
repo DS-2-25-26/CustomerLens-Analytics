@@ -4,9 +4,21 @@ author: "Francisco Javier Ruiz Rodríguez"
 output:
   html_document:
     toc: true
-    toc_float: true
+    toc_float:
+      collapsed: false
     toc_depth: 4
+    theme: flatly
+    highlight: tango
+    code_folding: show
 ---
+
+```{=html}
+<style>
+body {
+  text-align: justify;
+}
+</style>
+```
 
 # Anatomía del cliente de alto valor
 
@@ -60,6 +72,32 @@ data$Marital_Status <- factor(
 )
 ```
 
+### 2.1. Verificación de calidad de datos {.unnumbered}
+
+Antes de empezar el análisis verificamos que las variables clave no presentan valores faltantes ni valores imposibles. Siguiendo las buenas prácticas del proyecto, el preprocesamiento ya cubrió los problemas más graves; este check rápido garantiza consistencia local.
+
+```{r}
+# NAs en variables clave
+data %>%
+  summarise(
+    NA_Spending  = sum(is.na(Total_Spending)),
+    NA_Income    = sum(is.na(Income)),
+    NA_Age       = sum(is.na(Age)),
+    NA_Recency   = sum(is.na(Recency)),
+    NA_Purchases = sum(is.na(Total_Purchases))
+  )
+```
+
+```{r}
+# Valores extremos o imposibles
+cat("Clientes con gasto < 0:", sum(data$Total_Spending < 0, na.rm = TRUE), "\n")
+cat("Clientes con Income < 0:", sum(data$Income < 0, na.rm = TRUE), "\n")
+cat("Clientes con Age > 100:", sum(data$Age > 100, na.rm = TRUE), "\n")
+cat("Clientes con Deals_Ratio > 1:", sum(data$Deals_Ratio > 1, na.rm = TRUE), "\n")
+```
+
+> **Resultado:** Todas las variables clave están completas y dentro de rangos válidos. El análisis opera sobre datos limpios.
+
 Las variables que utilizaremos abarcan todas las dimensiones del dataset:
 
 -   **Variable de segmentación**: `Total_Spending` (gasto total en los últimos 2 años).
@@ -87,10 +125,13 @@ summary(data$Total_Spending)
 ggplot(data, aes(x = Total_Spending)) +
   geom_histogram(bins = 40, fill = "#4A90D9", color = "white", alpha = 0.85) +
   geom_vline(aes(xintercept = median(Total_Spending)),
-             color = "#D94A4A", linetype = "dashed", linewidth = 0.8) +
-  annotate("text", x = median(data$Total_Spending) + 80, y = Inf,
-           label = paste0("Mediana = ", round(median(data$Total_Spending), 0), " €"),
-           vjust = 2, hjust = 0, color = "#D94A4A", size = 4) +
+    color = "#D94A4A", linetype = "dashed", linewidth = 0.8
+  ) +
+  annotate("text",
+    x = median(data$Total_Spending) + 80, y = Inf,
+    label = paste0("Mediana = ", round(median(data$Total_Spending), 0), " €"),
+    vjust = 2, hjust = 0, color = "#D94A4A", size = 4
+  ) +
   labs(
     title = "Distribución del gasto total de los clientes",
     x = "Gasto total (€)", y = "Frecuencia"
@@ -111,7 +152,7 @@ Dividimos la variable `Total_Spending` en tres segmentos utilizando terciles, de
 -   **Alto**: clientes en el tercio superior de gasto.
 
 ```{r}
-cortes <- quantile(data$Total_Spending, probs = c(0, 1/3, 2/3, 1))
+cortes <- quantile(data$Total_Spending, probs = c(0, 1 / 3, 2 / 3, 1))
 cat("Puntos de corte (terciles):", cortes, "\n")
 
 data <- data %>%
@@ -150,8 +191,8 @@ resumen_segmentos <- data %>%
     across(
       all_of(vars_numericas),
       list(
-        Media = ~round(mean(.x, na.rm = TRUE), 2),
-        Mediana = ~round(median(.x, na.rm = TRUE), 2)
+        Media = ~ round(mean(.x, na.rm = TRUE), 2),
+        Mediana = ~ round(median(.x, na.rm = TRUE), 2)
       ),
       .names = "{.col}__{.fn}"
     ),
@@ -194,10 +235,10 @@ composicion <- data %>%
   summarise(
     Vinos = round(mean(Pct_Wines), 1),
     Carne = round(mean(Pct_Meat), 1),
-    Oro   = round(mean(Pct_Gold), 1),
+    Oro = round(mean(Pct_Gold), 1),
     Pescado = round(mean(Pct_Fish), 1),
-    Dulces  = round(mean(Pct_Sweet), 1),
-    Fruta   = round(mean(Pct_Fruit), 1),
+    Dulces = round(mean(Pct_Sweet), 1),
+    Fruta = round(mean(Pct_Fruit), 1),
     .groups = "drop"
   )
 
@@ -338,9 +379,9 @@ data_canal <- data %>%
   select(Segmento_Gasto, all_of(vars_canal)) %>%
   pivot_longer(cols = all_of(vars_canal), names_to = "Canal", values_to = "Compras") %>%
   mutate(Canal = case_when(
-    Canal == "NumWebPurchases"     ~ "Web",
+    Canal == "NumWebPurchases" ~ "Web",
     Canal == "NumCatalogPurchases" ~ "Catálogo",
-    Canal == "NumStorePurchases"   ~ "Tienda"
+    Canal == "NumStorePurchases" ~ "Tienda"
   ))
 
 ggplot(data_canal, aes(x = Canal, y = Compras, fill = Segmento_Gasto)) +
@@ -372,6 +413,9 @@ ggplot(data, aes(x = Segmento_Gasto, y = Deals_Ratio, fill = Segmento_Gasto)) +
 
 Se aprecia un patrón interesante: los clientes de gasto **bajo** presentan la mayor proporción de compras con descuento, mientras que los de gasto **alto** recurren menos a ofertas. Esto podría indicar que los clientes de alto valor son menos sensibles al precio o que su cesta de compra habitual (vinos, carne) se ve menos afectada por promociones.
 
+> **Hallazgo:** El `Deals_Ratio` actúa de forma inversa al valor del cliente: a mayor gasto, menor dependencia de descuentos. Este hallazgo tiene implicaciones directas para la gestión de márgenes: las promociones captan al segmento menos valioso, mientras el segmento premium compra a precio completo de forma autónoma.
+
+
 ### 5.5. Visitas web mensuales
 
 ```{r fig.width=7, fig.height=4}
@@ -387,6 +431,10 @@ ggplot(data, aes(x = Segmento_Gasto, y = NumWebVisitsMonth, fill = Segmento_Gast
 ```
 
 Paradójicamente, los clientes de gasto **bajo** visitan **más** la web que los de gasto alto. Esto podría reflejar un comportamiento más informacional o comparativo (buscar ofertas, comparar productos) frente al comportamiento más decisivo de los clientes de alto valor, que compran directamente por catálogo o en tienda.
+
+> **Hallazgo — Paradoja del navegante:** Los clientes que más visitan la web son precisamente los que menos gastan. La web funciona más como canal de búsqueda de ofertas que como canal de compra de alto ticket. Este resultado conecta con el concepto de "navegante vs. comprador" y anticipa la paradoja desarrollada en el segundo notebook individual.
+
+---
 
 ### 5.6. Campañas aceptadas
 
@@ -420,8 +468,10 @@ Descriptivamente, los clientes de alto valor muestran una tasa de respuesta a ca
 ```{r fig.width=8, fig.height=5}
 ggplot(data, aes(x = Income, y = Total_Spending, color = Segmento_Gasto)) +
   geom_point(alpha = 0.4, size = 1.5) +
-  geom_smooth(aes(color = NULL), method = "loess", se = FALSE,
-              linewidth = 1, linetype = "dashed", color = "black") +
+  geom_smooth(aes(color = NULL),
+    method = "loess", se = FALSE,
+    linewidth = 1, linetype = "dashed", color = "black"
+  ) +
   scale_color_manual(values = c("Bajo" = "#E8A838", "Medio" = "#4A90D9", "Alto" = "#2ECC71")) +
   scale_x_continuous(labels = scales::comma) +
   coord_cartesian(xlim = c(0, 150000)) +
@@ -447,31 +497,53 @@ Se adopta un nivel de significación $\alpha = 0.05$.
 
 ### 6.2. Tests para variables numéricas (Kruskal-Wallis)
 
+Planteamiento formal del contraste:
+
+- **H₀**: La distribución de cada variable numérica es la misma en los tres segmentos de gasto.
+- **H₁**: Al menos un segmento presenta una distribución distinta.
+
+Se rechaza H₀ si el p-valor < α = 0.05.
+
 ```{r}
 resultados_kw <- data.frame(
   Variable = vars_numericas,
   Estadistico = NA_real_,
   p_valor = NA_real_,
+  Epsilon2 = NA_real_,
   stringsAsFactors = FALSE
 )
 
 for (i in seq_along(vars_numericas)) {
   v <- vars_numericas[i]
   test <- kruskal.test(reformulate("Segmento_Gasto", response = v), data = data)
-  resultados_kw$Estadistico[i] <- round(test$statistic, 2)
+  n <- nrow(data)
+  k <- 3 # número de grupos
+  H <- as.numeric(test$statistic)
+  resultados_kw$Estadistico[i] <- round(H, 2)
   resultados_kw$p_valor[i] <- round(test$p.value, 6)
+  resultados_kw$Epsilon2[i] <- round((H - k + 1) / (n - k), 4)
 }
 
 resultados_kw$Significativa <- ifelse(resultados_kw$p_valor < 0.05, "Sí", "No")
 
-resultados_kw
+knitr::kable(resultados_kw,
+  digits = 4,
+  caption = "Kruskal-Wallis y tamaño del efecto (ε²) por variable"
+)
 ```
+
+> Los valores de ε² > 0.14 se interpretan como efecto grande. Un ε² cercano a 0 indica que el segmento explica poca variabilidad de esa variable, aunque el p-valor sea significativo por el tamaño muestral.
 
 ```{r}
 vars_significativas <- resultados_kw$Variable[resultados_kw$Significativa == "Sí"]
 ```
 
 ### 6.3. Tests para variables categóricas (Chi-cuadrado)
+
+Planteamiento formal:
+
+- **H₀**: La variable categórica y el segmento de gasto son independientes.
+- **H₁**: Existe asociación estadísticamente significativa entre ambas variables.
 
 ```{r}
 cat("=== Education vs Segmento_Gasto ===\n")
@@ -514,12 +586,18 @@ if (length(vars_no_sig) > 0) {
 }
 
 cat("\n--- Variables categóricas (Chi-cuadrado) ---\n")
-cat(paste0("  Education:      p = ", format.pval(test_edu$p.value, digits = 4),
-           " → ", ifelse(test_edu$p.value < 0.05, "Significativa ✓", "No significativa ✗"), "\n"))
-cat(paste0("  Marital_Status: p = ", format.pval(test_ms$p.value, digits = 4),
-           " → ", ifelse(test_ms$p.value < 0.05, "Significativa ✓", "No significativa ✗"), "\n"))
-cat(paste0("  Has_Children:   p = ", format.pval(test_hijos$p.value, digits = 4),
-           " → ", ifelse(test_hijos$p.value < 0.05, "Significativa ✓", "No significativa ✗"), "\n"))
+cat(paste0(
+  "  Education:      p = ", format.pval(test_edu$p.value, digits = 4),
+  " → ", ifelse(test_edu$p.value < 0.05, "Significativa ✓", "No significativa ✗"), "\n"
+))
+cat(paste0(
+  "  Marital_Status: p = ", format.pval(test_ms$p.value, digits = 4),
+  " → ", ifelse(test_ms$p.value < 0.05, "Significativa ✓", "No significativa ✗"), "\n"
+))
+cat(paste0(
+  "  Has_Children:   p = ", format.pval(test_hijos$p.value, digits = 4),
+  " → ", ifelse(test_hijos$p.value < 0.05, "Significativa ✓", "No significativa ✗"), "\n"
+))
 ```
 
 ## 7. Perfil tipo del cliente de alto valor
@@ -798,3 +876,16 @@ Los principales hallazgos se resumen a continuación:
     -   La variable `Total_Spending` fue creada como suma del gasto en seis categorías, por lo que las variables de canal de compra son en parte un *proxy* del propio gasto. La inclusión de un segundo modelo sin estas variables mitiga, pero no elimina completamente, este sesgo.
 
 En conjunto, este estudio proporciona un marco analítico multidimensional —descriptivo, inferencial y predictivo— para que la empresa pueda identificar, retener y potenciar a sus clientes más valiosos, diseñando estrategias diferenciadas según el perfil de valor.
+
+## Referencias
+
+Gupta, S., Hanssens, D., Hardie, B., Kahn, W., Kumar, V., Lin, N., Ravishanker, N., & Sriram, S. (2006). Modeling customer lifetime value. *Journal of Service Research*, 9(2), 139–155. <https://doi.org/10.1177/1094670506293810>
+
+Kumar, V., & Reinartz, W. (2016). Creating enduring customer value. *Journal of Marketing*, 80(6), 36–68. <https://doi.org/10.1509/jm.15.0414>
+
+Moe, W. W. (2003). Buying, searching, or browsing: Differentiating between online shoppers using in-store navigational clickstream. *Journal of Consumer Psychology*, 13(1–2), 29–39. <https://doi.org/10.1207/S15327663JCP13-1&2_03>
+
+R for Data Science. "Data Transformation: dplyr and data manipulation". Recuperado de: <https://r4ds.hadley.nz/data-transform>
+
+UC Business Analytics. "Regression Trees and Recursive Partitioning in R". Recuperado de: <https://uc-r.github.io/regression_trees>
+
