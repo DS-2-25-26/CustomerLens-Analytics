@@ -32,3 +32,4 @@ Cada alumno se ha encargado de resolver un par de preguntas específicadas a con
 
 ### Francisco Javier Ruiz Rodríguez
 - ¿Qué factores demográficos y de comportamiento caracterizan a los clientes de alto valor (alto gasto) frente a los de bajo valor?
+- ¿La recencia de compra y la actividad web permiten identificar perfiles diferenciados de compromiso del cliente?
