@@ -722,3 +722,16 @@ Desde una perspectiva de *Customer Analytics*, estos resultados sugieren estrate
 -   **Umbral de saturación como criterio de segmentación**: el punto de inflexión de la curva de diversificación (\~decil 6–7) puede servir como umbral para diferenciar segmentos con potencial de crecimiento en variedad frente a segmentos ya saturados.
 
 ## Referencias
+
+UC Business Analytics.
+"Logistic Regression for Customer Likelihood and Classification".
+Recuperado de: <https://uc-r.github.io/logistic_regression>
+
+R for Data Science.
+Cheat Sheet and Guide". Recuperado de: <https://r4ds.hadley.nz>
+
+Wang, H., Xie, Y., & Wang, C.
+(2023).
+"The retailer’s brand promotion strategy under competition: The impact of supply uncertainty".
+*Journal of Retailing and Consumer Services*, 73(103324).
+Recuperado de: <https://doi.org/10.1016/j.jretconser.2023.103324>
