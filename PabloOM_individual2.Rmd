@@ -1,5 +1,6 @@
 ---
-title: "CustomerLens-Analytics. P. Individual 2."
+title: "CustomerLens-Analytics"
+subtitle: "La Estrategia Multicanal: ¿Suma o Sinergia?"
 author: "Pablo Oliva Muñoz"
 output:
   html_document:
@@ -18,12 +19,77 @@ output:
 body {
   text-align: justify;
 }
+.insight-box {
+  background-color: #f0fdf4;
+  border-left: 5px solid #22c55e;
+  padding: 15px;
+  margin: 20px 0;
+  border-radius: 4px;
+  color: #166534;
+  font-size: 1.25em;
+}
+</style>
+```
+
+```{=html}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
+
+#header {
+    margin-top: 40px;
+    margin-bottom: 40px;
+    padding: 80px 20px;
+    /* Degradado de azul profundo a azul profesional */
+    background: linear-gradient(135deg, #000428 0%, #004e92 100%);
+    color: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 78, 146, 0.3);
+    text-align: center;
+    font-family: 'Inter', sans-serif;
+}
+
+h1.title {
+    font-weight: 800;
+    font-size: 3.8em;
+    letter-spacing: -2px;
+    margin-bottom: 15px;
+    color: #ffffff;
+}
+
+.subtitle {
+    font-size: 1.6em;
+    font-weight: 400;
+    opacity: 0.95;
+    margin-bottom: 25px;
+    color: #e0e0e0;
+}
+
+h4.author {
+    font-weight: 400;
+    font-size: 1.1em;
+    margin-top: 30px;
+    color: #ffffff;
+    opacity: 0.8;
+}
+
+h4.date {
+    font-size: 0.9em;
+    font-weight: 300;
+    margin-top: 10px;
+    color: #abdbe3;
+}
+
+/* Personalización del menú lateral (TOC) para que no desentone */
+.list-group-item.active, .list-group-item.active:focus, .list-group-item.active:hover {
+    background-color: #004e92;
+    border-color: #004e92;
+    font-weight: bold;
+}
 </style>
 ```
 
 ------------------------------------------------------------------------
 
-# La Estrategia Multicanal: ¿Suma o Sinergia?
 
 ![](images/canal_2.jpeg)
 
@@ -122,9 +188,11 @@ if (levene_result$`Pr(>F)`[1] < 0.05) {
 }
 ```
 
-> **Hallazgo-** El test de Levene para homogeneidad de varianzas resultó significativo (F = 562.5, p \< 2.2e-16).
->
-> Esto indica que las varianzas entre grupos son desiguales. Esto es consistente con lo esperado en variables de gasto económico, que suelen mostrar distribuciones asimétricas y varianzas crecientes a medida que aumenta la media, como ocurre en datos multicanal donde los consumidores tricanal presentan un rango de gasto mucho mayor. En este contexto, el ANOVA de Welch (var.equal = FALSE) constituye la opción estadísticamente adecuada.
+<div class="insight-box">
+  **Hallazgo clave:** El test de Levene para homogeneidad de varianzas resultó significativo (F = 562.5, p < 2.2e-16).
+  
+  Esto indica que las varianzas entre grupos son desiguales. Esto es consistente con lo esperado en variables de gasto económico, que suelen mostrar distribuciones asimétricas y varianzas crecientes a medida que aumenta la media, como ocurre en datos multicanal donde los consumidores tricanal presentan un rango de gasto mucho mayor. En este contexto, el ANOVA de Welch (var.equal = FALSE) constituye la opción estadísticamente adecuada.
+</div>
 
 ### ANOVA de Welch {.unnumbered}
 
@@ -162,11 +230,13 @@ print("p-valores ajustados por Bonferroni (Varianzas desiguales):")
 print(post_hoc$p.value)
 ```
 
-> **Hallazgo — Objetivo 1 resuelto:** El p-valor del ANOVA de Welch es prácticamente cero (2.2e-16), lo que descarta que las diferencias de gasto sean casuales.
->
-> Los clientes que usan los 3 canales gastan muchísimo más que el resto. Sin embargo, los datos no muestran una diferencia real de gasto entre usar 1 o 2 canales (probablemente porque tenemos muy pocos clientes monocanal para comparar bien). Pero lo que realmente importa para el negocio es que **el gran salto de dinero ocurre al pasar de 2 a 3 canales**.
->
-> Sabiendo que usar los tres canales dispara el gasto, la gran pregunta que nos queda es: ¿ese subidón es solo la suma normal de lo que gastarían en cada sitio por separado, o existe un efecto multiplicador al combinarlos?
+<div class="insight-box">
+  **Hallazgo — Objetivo 1 resuelto:** El p-valor del ANOVA de Welch es prácticamente cero (2.2e-16), lo que descarta que las diferencias de gasto sean casuales.
+  
+  Los clientes que usan los 3 canales gastan muchísimo más que el resto. Sin embargo, los datos no muestran una diferencia real de gasto entre usar 1 o 2 canales (probablemente porque tenemos muy pocos clientes monocanal para comparar bien). Pero lo que realmente importa para el negocio es que **el gran salto de dinero ocurre al pasar de 2 a 3 canales**.
+  
+  Sabiendo que usar los tres canales dispara el gasto, la gran pregunta que nos queda es: ¿ese subidón es solo la suma normal de lo que gastarían en cada sitio por separado, o existe un efecto multiplicador al combinarlos?
+</div>
 
 ------------------------------------------------------------------------
 
@@ -269,11 +339,13 @@ tidy(mod_controlado) %>%
          `Error Std.` = std.error, `t-valor` = statistic, `p-valor` = p.value)
 ```
 
-> **Hallazgo — Objetivos 2, 3 resueltos:** Los tres modelos mejoran progresivamente el ajuste: R² ajustado del 72,6 % (Modelo 1), al 74,17 % (Modelo 2) al **76,15 % (Modelo 3)**
->
-> Las interacciones entre pares de canales son positivas y significativas — **Web × Catálogo (+15–16 €)**, Catálogo × Tienda (+4–5 €), Web × Tienda (+2–3 €) — lo que confirma la existencia de efectos multiplicadores. La interacción triple presenta una saturación leve (–2 €): el valor incremental de combinar los tres canales viene principalmente de los pares, aunque el cliente tricanal sigue acumulando todas las sinergias simultáneamente, lo que lo convierte en el **perfil de mayor gasto predicho.**
->
-> Controlando por ingresos (Modelo 3), las interacciones siguen siendo significativas: la sinergia es un comportamiento real de los clientes, no solo un efecto del nivel de renta. El Modelo 3 es la referencia analítica del resto del notebook. **En otras palabras, el ingreso marca el gasto base de cada cliente, y la combinación de canales añade valor extra por encima de ese nivel.**
+<div class="insight-box">
+  **Hallazgo — Objetivos 2, 3 resueltos:** Los tres modelos mejoran progresivamente el ajuste: R² ajustado del 72,6 % (Modelo 1), al 74,17 % (Modelo 2) al **76,15 % (Modelo 3)**
+  
+  Las interacciones entre pares de canales son positivas y significativas — **Web × Catálogo (+15–16 €)**, Catálogo × Tienda (+4–5 €), Web × Tienda (+2–3 €) — lo que confirma la existencia de efectos multiplicadores. La interacción triple presenta una saturación leve (–2 €): el valor incremental de combinar los tres canales viene principalmente de los pares, aunque el cliente tricanal sigue acumulando todas las sinergias simultáneamente, lo que lo convierte en el **perfil de mayor gasto predicho.**
+  
+  Controlando por ingresos (Modelo 3), las interacciones siguen siendo significativas: la sinergia es un comportamiento real de los clientes, no solo un efecto del nivel de renta. El Modelo 3 es la referencia analítica del resto del notebook. **En otras palabras, el ingreso marca el gasto base de cada cliente, y la combinación de canales añade valor extra por encima de ese nivel.**
+</div>
 
 ------------------------------------------------------------------------
 
@@ -342,7 +414,9 @@ ggplot(perfiles, aes(x = Perfil, y = Pred, fill = Color_group)) +
   )
 ```
 
-> **Hallazgo — Objetivo 4 resuelto:** El gráfico responde de forma directa: el perfil **"Los Tres (Tricanal)"** genera un gasto predicho notablemente superior no solo a cualquier perfil monocanal, sino también a cualquier perfil bicanal. Si los canales fuesen puramente aditivos, "Los Tres" debería valer exactamente la suma de "Solo Web" + "Solo Catálogo" + "Solo Tienda". Que supere esa suma es la definición exacta de **sinergia**: el valor de la combinación excede la suma de las partes.
+<div class="insight-box">
+  **Hallazgo — Objetivo 4 resuelto:** El gráfico responde de forma directa: el perfil **"Los Tres (Tricanal)"** genera un gasto predicho notablemente superior no solo a cualquier perfil monocanal, sino también a cualquier perfil bicanal. Si los canales fuesen puramente aditivos, "Los Tres" debería valer exactamente la suma de "Solo Web" + "Solo Catálogo" + "Solo Tienda". Que supere esa suma es la definición exacta de **sinergia**: el valor de la combinación excede la suma de las partes.
+</div>
 
 ------------------------------------------------------------------------
 
@@ -369,7 +443,9 @@ data.frame(
 )
 ```
 
-> **Interpretación:** La progresión de los tres modelos es la conclusión cuantitativa del análisis. Cada fila de la tabla debe leerse como una respuesta a una pregunta: el **Modelo 1** establece cuánto explican los canales por separado; el **Modelo 2** añade cómo interaccionan entre sí — si su AIC baja y su R² ajustado sube respecto al Modelo 1, existe sinergia real; el **Modelo 3** demuestra si esa sinergia sobrevive al quitar el posible efecto confusor de los ingresos. RMSE más bajo significa mejor predicción del gasto real en euros.
+<div class="insight-box">
+  **Interpretación:** La progresión de los tres modelos es la conclusión cuantitativa del análisis. Cada fila de la tabla debe leerse como una respuesta a una pregunta: el **Modelo 1** establece cuánto explican los canales por separado; el **Modelo 2** añade cómo interaccionan entre sí — si su AIC baja y su R² ajustado sube respecto al Modelo 1, existe sinergia real; el **Modelo 3** demuestra si esa sinergia sobrevive al quitar el posible efecto confusor de los ingresos. RMSE más bajo significa mejor predicción del gasto real en euros.
+</div>
 
 ------------------------------------------------------------------------
 
@@ -378,8 +454,8 @@ data.frame(
 ### Respuesta a la pregunta de investigación {.unnumbered}
 
 > **¿Ese aumento de gasto es una simple suma de ventas independientes, o existe un efecto multiplicador (sinergias) al combinar canales?**
->
-> La respuesta es clara: **existe un efecto multiplicador real.** El aumento de gasto al combinar canales no se explica como una suma de contribuciones independientes. Las combinaciones generan gasto extra por encima de lo que cada canal aportaría por separado, y ese efecto persiste incluso entre clientes del mismo nivel de ingresos.
+
+  **Respuesta:** La respuesta es clara: **existe un efecto multiplicador real.** El aumento de gasto al combinar canales no se explica como una suma de contribuciones independientes. Las combinaciones generan gasto extra por encima de lo que cada canal aportaría por separado, y ese efecto persiste incluso entre clientes del mismo nivel de ingresos.
 
 ### Síntesis por objetivos {.unnumbered}
 

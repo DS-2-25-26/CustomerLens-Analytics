@@ -1,5 +1,6 @@
 ---
-title: "CustomerLens-Analytics. P. Individual 1."
+title: "CustomerLens-Analytics"
+subtitle: "La Estrategia Multicanal: ¿Más Canales = Más Compras?"
 author: "Pablo Oliva Muñoz"
 output:
   html_document:
@@ -18,12 +19,77 @@ output:
 body {
   text-align: justify;
 }
+.insight-box {
+  background-color: #f0fdf4;
+  border-left: 5px solid #22c55e;
+  padding: 15px;
+  margin: 20px 0;
+  border-radius: 4px;
+  color: #166534;
+  font-size: 1.25em;
+}
+</style>
+```
+
+```{=html}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
+
+#header {
+    margin-top: 40px;
+    margin-bottom: 40px;
+    padding: 80px 20px;
+    /* Degradado de azul profundo a azul profesional */
+    background: linear-gradient(135deg, #000428 0%, #004e92 100%);
+    color: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 78, 146, 0.3);
+    text-align: center;
+    font-family: 'Inter', sans-serif;
+}
+
+h1.title {
+    font-weight: 800;
+    font-size: 3.8em;
+    letter-spacing: -2px;
+    margin-bottom: 15px;
+    color: #ffffff;
+}
+
+.subtitle {
+    font-size: 1.6em;
+    font-weight: 400;
+    opacity: 0.95;
+    margin-bottom: 25px;
+    color: #e0e0e0;
+}
+
+h4.author {
+    font-weight: 400;
+    font-size: 1.1em;
+    margin-top: 30px;
+    color: #ffffff;
+    opacity: 0.8;
+}
+
+h4.date {
+    font-size: 0.9em;
+    font-weight: 300;
+    margin-top: 10px;
+    color: #abdbe3;
+}
+
+/* Personalización del menú lateral (TOC) para que no desentone */
+.list-group-item.active, .list-group-item.active:focus, .list-group-item.active:hover {
+    background-color: #004e92;
+    border-color: #004e92;
+    font-weight: bold;
+}
 </style>
 ```
 
 ------------------------------------------------------------------------
 
-# La Estrategia Multicanal: ¿Más Canales = Más Compras?
 
 ![](images/canal.png)
 
@@ -162,7 +228,9 @@ ggplotly(p1, tooltip = "text")
 ggplotly(p2, tooltip = "text")
 ```
 
-> **Hallazgo:** La gran mayoría son **tricanales (≈73%)** — el comportamiento multicanal es la norma, no la excepción. El histograma lo deja claro: los monocanales se concentran por debajo de las 8 compras, mientras que los tricanales son el único perfil capaz de superar las 15–20 compras de forma sistemática.
+<div class="insight-box">
+  **Hallazgo clave:** La gran mayoría son **tricanales (≈73%)** — el comportamiento multicanal es la norma, no la excepción. El histograma lo deja claro: los monocanales se concentran por debajo de las 8 compras, mientras que los tricanales son el único perfil capaz de superar las 15–20 compras de forma sistemática.
+</div>
 
 ------------------------------------------------------------------------
 
@@ -214,7 +282,9 @@ hg2 <- ggplot(data %>% filter(Total_Spending > 0), aes(x = Total_Spending)) +
 ggarrange(hg1, hg2, ncol = 1, nrow = 2)
 ```
 
-> **Hallazgo:** Sin la escala logarítmica, el **Perfil B (Premium)** sería casi invisible. En escala log descubrimos que no hay un "cliente promedio", sino dos motores distintos: el **Perfil A** (masa con ticket de 30–150€) y el **Perfil B** (segmento Premium de 600–2.500€). La siguiente sección confirma a cuál de los dos pertenecen mayoritariamente los tricanales.
+<div class="insight-box">
+  **Hallazgo clave:** Sin la escala logarítmica, el **Perfil B (Premium)** sería casi invisible. En escala log descubrimos que no hay un "cliente promedio", sino dos motores distintos: el **Perfil A** (masa con ticket de 30–150€) y el **Perfil B** (segmento Premium de 600–2.500€). La siguiente sección confirma a cuál de los dos pertenecen mayoritariamente los tricanales.
+</div>
 
 ------------------------------------------------------------------------
 
@@ -272,10 +342,12 @@ p_box_gasto <- ggplot(outlier_data,
 ggarrange(p_violin, p_box_gasto, ncol = 2)
 ```
 
+<div class="insight-box">
 > **Hallazgo 1 — Volumen:** Tricanal (μ = 15.4 compras). La multicanalidad "implica un comportamiento de compra de alta intensidad que simplemente no existe en los otros perfiles.\
 > **Hallazgo 2 — Gasto:** Los outliers del grupo tricanal (etiquetados en el boxplot) representan los clientes de mayor gasto absoluto de toda la base de datos. El gasto alto no es una rareza en este grupo, es la dirección en la que apunta la distribución.\
-> **Respuesta:** Los clientes tricanales pertenecen mayoritariamente al **Perfil B (Premium)**. Su distribución de gasto es la única que alcanza los valores superiores de 600–2.500€, mientras que los monocanales se concentran en el rango del Perfil A (.
+> **Respuesta:** Los clientes tricanales pertenecen mayoritariamente al **Perfil B (Premium)**. Su distribución de gasto es la única que alcanza los valores superiores de 600–2.500€, mientras que los monocanales se concentran en el rango del Perfil A.
 
+</div>
 ------------------------------------------------------------------------
 
 ## El Mix de Canales: ¿Sustitución o Efecto incremental?
@@ -330,6 +402,7 @@ p_facet_canal <- ggplot(data_long, aes(x = Num_Channels_f, y = Compras, fill = N
 ggarrange(p_heat, p_facet_canal, nrow = 2, heights = c(1, 1.1))
 ```
 
+<div class="insight-box">
 > **Hallazgo clave — No hay efecto sustitución, hay un efecto acumulativo.**
 >
 > En el mapa de calor se aprecia que, a medida que aumenta el número de canales utilizados, crece el promedio de compras en todos los canales. Por ejemplo, en tienda los clientes tricanal registran **6.8 compras de media**, frente a **2.3 en monocanal** y **3.0 en bicanal**.
@@ -337,6 +410,8 @@ ggarrange(p_heat, p_facet_canal, nrow = 2, heights = c(1, 1.1))
 > Esto indica que los clientes multicanal no están trasladando sus compras de la tienda hacia la web o el catálogo, sino que están sumando compras adicionales en los otros canales manteniendo —e incluso aumentando— su actividad en tienda.
 >
 > Los boxplots del panel inferior refuerzan esta conclusión: la mediana de compras en cada canal aumenta de forma consistente al pasar de clientes monocanal a bicanal y, posteriormente, a tricanal. En conjunto, todo indica que los canales extra tienen un efecto incremental sobre el cliente.
+
+</div>
 
 ------------------------------------------------------------------------
 
@@ -384,12 +459,14 @@ p_linea <- ggplot(line_data, aes(x = Num_Channels, y = Media_Gasto,
 
 ggplotly(p_linea, tooltip = "text")
 ```
-
+<div class="insight-box">
 > **Hallazgo final:** El efecto multicanal es **robusto en todos los segmentos de renta**.
 >
 > El gasto medio aumenta al añadir canales en todos los tramos de renta. Aunque quienes tienen mayores ingresos gastan más en términos absolutos, el incremento asociado al uso de más canales se repite en todos los grupos.
 >
 > Por tanto, el efecto multicanal no es solo una cuestión de mayor poder adquisitivo, sino un patrón de compra que se activa al operar en más canales.
+
+</div>
 
 ------------------------------------------------------------------------
 

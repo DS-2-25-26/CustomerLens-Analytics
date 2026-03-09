@@ -1,12 +1,13 @@
 ---
-title: "CustomerLens-Analytics. Grupo 2."
-author: "Jaime Linares Barrera, Andrés Martínez Reviriego, Pablo Oliva Muñoz y Francisco Javier Ruiz Rodríguez "
+title: "CustomerLens-Analytics"
+subtitle: "Dime con quién vives y te diré qué compras"
+author: "Jaime Linares, Andrés Martínez, Pablo Oliva y Francisco Javier Ruiz | Grupo 2"
 output:
   html_document:
+    theme: flatly
     toc: true
     toc_float: true
     toc_depth: 4
-    # number_sections: true
 ---
 
 ```{=html}
@@ -14,14 +15,82 @@ output:
 body {
   text-align: justify;
 }
+.insight-box {
+  background-color: #f0fdf4;
+  border-left: 5px solid #22c55e;
+  padding: 15px;
+  margin: 20px 0;
+  border-radius: 4px;
+  color: #166534;
+  font-size: 1.05em;
+}
 </style>
 ```
 
-# Dime con quién vives y te diré qué compras
+```{=html}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
+
+#header {
+    margin-top: 40px;
+    margin-bottom: 40px;
+    padding: 80px 20px;
+    /* Degradado de azul profundo a azul profesional */
+    background: linear-gradient(135deg, #000428 0%, #004e92 100%);
+    color: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 78, 146, 0.3);
+    text-align: center;
+    font-family: 'Inter', sans-serif;
+}
+
+h1.title {
+    font-weight: 800;
+    font-size: 3.8em;
+    letter-spacing: -2px;
+    margin-bottom: 15px;
+    color: #ffffff;
+}
+
+.subtitle {
+    font-size: 1.6em;
+    font-weight: 400;
+    opacity: 0.95;
+    margin-bottom: 25px;
+    color: #e0e0e0;
+}
+
+h4.author {
+    font-weight: 400;
+    font-size: 1.1em;
+    margin-top: 30px;
+    color: #ffffff;
+    opacity: 0.8;
+}
+
+h4.date {
+    font-size: 0.9em;
+    font-weight: 300;
+    margin-top: 10px;
+    color: #abdbe3;
+}
+
+/* Personalización del menú lateral (TOC) para que no desentone */
+.list-group-item.active, .list-group-item.active:focus, .list-group-item.active:hover {
+    background-color: #004e92;
+    border-color: #004e92;
+    font-weight: bold;
+}
+</style>
+```
 
 ## Contextualización y motivación
 
-Comprender cómo la estructura familiar influye en el comportamiento de compra es una de las preguntas más relevantes en *Customer Analytics*. En un contexto de distribución generalista, los hogares con hijos suelen gastar más en alimentación, pero no necesariamente a través de cualquier canal. La clave está en el **modelo de negocio**. En este notebook analizamos si la estructura familiar (presencia de hijos, número de menores y estado civil) está asociada a diferencias significativas en el patrón de gasto.
+Comprender cómo la estructura familiar influye en el comportamiento de compra es una de las preguntas más relevantes en *Customer Analytics* para maximizar el **CLV (Customer Lifetime Value)** y optimizar el Retorno de Inversión (ROI) en las campañas. En un contexto de distribución generalista, los hogares con hijos suelen gastar más en alimentación básica, pero no necesariamente a través de cualquier canal ni en gamas altas. La clave está en alinear el catálogo con el **modelo de negocio**.
+
+En este notebook nos planteamos la siguiente pregunta core de negocio:
+
+**¿Hay relación entre la estructura familiar del cliente y su patrón de consumo?**
 
 A partir de la pregunta principal se derivan las siguientes subpreguntas:
 
@@ -114,6 +183,8 @@ ggplot(data, aes(x = Has_Children, y = Total_Spending, fill = Has_Children)) +
     )
 ```
 
+**Interpretación:** En este gráfico de violín superpuesto con diagrama de caja, observamos claramente cómo la distribución del grupo "Sin hijos" se sitúa muy por encima de la del grupo "Con hijos". El rombo negro (la media) del grupo sin hijos frente a el de los hogares con menores, marcan una brecha de consumo evidente a primera vista.
+
 ### 1.3. Test estadístico: Wilcoxon
 
 Dado que la distribución del gasto total presenta asimetría y valores atípicos, utilizamos el **test de Wilcoxon** (test no paramétrico equivalente al *t*-test), que no asume normalidad y es robusto frente a distribuciones sesgadas.
@@ -131,9 +202,11 @@ cat(
 )
 ```
 
-**Interpretación**: Si el *p-valor* es inferior a 0,05, existe evidencia estadísticamente significativa de que los hogares con hijos y sin hijos presentan un gasto total diferente. El tamaño del efecto (diferencia de medianas) cuantifica la magnitud práctica de esta diferencia.
+Los resultados de este test estadístico son concluyentes a nivel empírico: al arrojar un *p-valor* inferior al umbral de 0,05, confirmamos formalmente que el perfil de gasto varía de forma drástica dependiendo de si el cliente tiene hijos o no. La diferencia de medianas expuesta arriba aterriza este hallazgo de forma tangible, demostrando el salto real de facturación entre ambos perfiles.
 
-> **Hallazgo clave — Análisis 1:** Los hogares sin hijos gastan significativamente más que los hogares con hijos. La diferencia de medianas supera varios cientos de euros en los últimos dos años, lo que confirma que la presencia de menores es un factor estructural de bajo consumo en esta plataforma.
+::: insight-box
+**Hallazgo clave — Análisis 1:** Los hogares sin hijos gastan significativamente más que los hogares con hijos. La diferencia de medianas supera varios cientos de euros (casi un 50% extra) en los últimos dos años, lo que confirma que la presencia de menores es un factor estructural de contención del ticket medio en esta plataforma.
+:::
 
 ## Análisis 2: Distribución del gasto por categoría de producto
 
@@ -190,7 +263,7 @@ ggplotly(p_gasto_cat, tooltip = "text") %>%
   )
 ```
 
-**Interpretación visual**: El gráfico de barras agrupadas confirma dos hechos estructurales. Primero, el vino es la categoría dominante en ambos grupos, pero su gasto medio cae drásticamente en familias con hijos. Segundo, la carne registra la segunda reducción más severa: categorías asociadas a un consumo más selectivo son precisamente las que más penalizan a los hogares con menores. En cambio, el gasto en fruta o dulces se resiente comparativamente menos, apuntando a una redistribución del presupuesto hacia productos más básicos cuando hay niños en casa.
+**Interpretación:** El gráfico de barras agrupadas ilustra de forma transparente esta polarización del presupuesto. Es evidente cómo el vino, aun liderando el mix de gasto en ambos grupos, se desploma vertiginosamente al aparecer menores en casa. Ocurre algo parecido con la carne, señalando que los productos de consumo más selectivo o de mayor coste unitario son los primeros en sacrificarse. Por el contrario, artículos de compra más rutinaria (fruta, dulces) resisten mucho mejor este cambio de estructura familiar.
 
 ### 2.3. Proporción relativa del gasto
 
@@ -233,7 +306,7 @@ p_prop <- ggplot(proporciones, aes(x = Has_Children, y = Proporcion, fill = Cate
 ggplotly(p_prop, tooltip = "text")
 ```
 
-**Interpretación de negocio**: El vino domina abrumadoramente el mix de gasto. Los hogares con hijos amplían ligeramente la proporción relativa de básicos, pero la participación del vino y la carne cae de forma visible. Este fenómeno no implica necesariamente que las familias con hijos consuman menos vino en términos absolutos: refleja que esta plataforma capta menos de ese gasto familiar.
+**Interpretación:** El protagonismo innegable del vino confirma las preferencias de muchos de los clientes sin hijos. Cuando hay hijos en la ecuación, las cestas abren obligatoriamente un hueco a los básicos, desplazando el peso relativo de los artículos de mayor margen. Lejos de implicar que las familias abandonen el vino en su vida cotidiana, este síntoma diagnostica que delegan esa compra en otras superficies generalistas y no a través de la plataforma.
 
 ### 2.4. Tests estadísticos por categoría
 
@@ -264,7 +337,9 @@ for (i in seq_along(categorias)) {
 resultados_wilcox
 ```
 
-> **Hallazgo clave — Análisis 2:** Las diferencias son estadísticamente significativas en todas las categorías de producto (p \< 0,05 en cada Wilcoxon). El vino y la carne son las categorías con mayor brecha entre grupos: los clientes sin hijos gastan de media entre 2 y 4 veces más en estas partidas. Las categorías de menor ticket (fruta, dulces) presentan diferencias absolutas menores, aunque igualmente significativas.
+::: insight-box
+**Hallazgo clave — Análisis 2:** Las diferencias son estadísticamente significativas en todas las categorías de producto (p \< 0,05 en cada Wilcoxon). El **vino y la carne son las categorías con mayor brecha entre grupos**: los clientes sin hijos gastan de media entre 2 y 4 veces más en estas partidas. Las categorías de menor ticket (fruta, dulces) presentan diferencias absolutas menores, aunque igualmente significativas.
+:::
 
 ## Análisis 3: Efecto del número de menores en el hogar
 
@@ -354,7 +429,11 @@ ggplot(gasto_nhijos, aes(x = Children_Home, y = Gasto, fill = Children_Home)) +
     )
 ```
 
-> **Hallazgo clave — Análisis 3:** El efecto escalera es claro : cada menor adicional en el hogar reduce el gasto total de forma consistente. El mayor salto se produce al pasar de 0 a 1 hijo, lo que sugiere un cambio radical de hábitos con la llegada del primer menor. El test de Kruskal-Wallis y Dunn lo confirman estadísticamente: las diferencias entre 0 y 1 hijo son las más robustas; entre 2 y 3 hijos el efecto incremental se modera.
+**Interpretación:** El vino y la carne sufren caídas de medianas dramáticas nada más entrar el primer hijo en escena. Curiosamente, categorías golosas (dulces) apenas muestran variación en su mediana sin importar el volumen de menores.
+
+::: insight-box
+**Hallazgo clave — Análisis 3:** El efecto escalera es evidente: cada menor adicional en el hogar **contrae el gasto total de forma consistente**. La canibalización más severa se produce al pasar de 0 a 1 hijo (reduciendo el gasto a la mitad), lo que constata el shock en los hábitos de consumo que supone el primer descendiente. Los tests (Kruskal-Wallis y Dunn) validan que estabilizar a la familia (+2 hijos) frena, en parte, esta caída drástica inicial.
+:::
 
 ## Análisis 4: Correlaciones entre estructura familiar y gasto
 
@@ -446,7 +525,11 @@ resultados_cor$Significativo <- ifelse(resultados_cor$p_valor < 0.05, "Sí", "No
 print(resultados_cor)
 ```
 
-> **Hallazgo clave — Análisis 4:** Las correlaciones de Spearman son negativas y significativas para todas las combinaciones de variables familiares (Kidhome, Teenhome) con el gasto. Las asociaciones más fuertes (ρ más negativo) se dan con el vino y el gasto total, mientras que las correlaciones con fruta y dulces son más débiles. Tener adolescentes en casa penaliza el gasto de forma comparable a tener niños pequeños, lo que indica que el efecto no se diluye con la edad de los hijos.
+::: insight-box
+**Hallazgo clave — Análisis 4:** Las correlaciones de Spearman son negativas y significativas para todas las combinaciones de variables familiares (Kidhome, Teenhome) con el gasto. Las asociaciones más fuertes (ρ más negativo) se dan con el **vino y el gasto total**, mientras que las correlaciones con fruta y dulces son más débiles. Tener adolescentes en casa penaliza el gasto de forma comparable a tener niños pequeños, lo que indica que **el efecto no se diluye con la edad de los hijos.**
+:::
+
+Las correlaciones de Spearman son negativas y significativas para todas las combinaciones de variables familiares (Kidhome, Teenhome) con el gasto. Las asociaciones más fuertes (ρ más negativo) se dan con el vino y el gasto total, mientras que las correlaciones con fruta y dulces son más débiles. Tener adolescentes en casa penaliza el gasto de forma comparable a tener niños pequeños, lo que indica que el efecto no se diluye con la edad de los hijos.
 
 ## Análisis 5: Estado civil y patrón de consumo
 
@@ -482,6 +565,8 @@ ggplot(data, aes(x = Marital_Status, y = Total_Spending, fill = Marital_Status))
         plot.title = element_text(face = "bold")
     )
 ```
+
+**Interpretación:** El estado civil `Single` (Soltero) y `Widow` (Viudo) encabezan el ránking visual arrastrando su caja fuertemente hacia la parte superior. Las categorías asociadas comúnmente con la consolidación familiar moderna (`Together` y `Married`) mantienen su mediana anclada en la franja baja de gasto, demostrando que el estar emparejado actúa como un reductor del ingreso en esta plataforma.
 
 ### 5.2. Test de Kruskal-Wallis
 
@@ -527,7 +612,9 @@ p <- ggplot(gasto_marital, aes(x = Marital_Status, y = Gasto_Medio, fill = Categ
 ggplotly(p)
 ```
 
-> **Hallazgo clave — Análisis 5:** El estado civil influye en el gasto, pero de forma moderada y mediada por la composición familiar. Los solteros (*Single*) y viudos (*Widow*) son los grupos con mayor gasto medio: ambos tienen una proporción muy baja de hijos en el hogar, lo que los convierte en el perfil de cliente de mayor valor para esta plataforma. Los casados y los que conviven en pareja tienen medianas más bajas, correlacionadas con mayor presencia de hijos. En términos de mix de producto, el vino domina en todos los estados civiles, sin diferencias sustanciales en la composición relativa del gasto.
+::: insight-box
+**Hallazgo clave — Análisis 5:** Estado civil actúa como proxy de la estructura familiar. Los solteros (*Single*) y viudos (*Widow*) encabezan el ranking de tracción de ganancias, auspiciados por la asimetría de menores a su cargo. Al margen de su volumen final, todos coinciden en abrazar el consumo de vino con un peso abrumador en su mix relativizado.
+:::
 
 ## Análisis 6 : Modelo predictivo — Árbol de decisión
 
@@ -558,6 +645,8 @@ rpart.plot(tree_model,
     cex = 0.8
 )
 ```
+
+**Interpretación del árbol:** El primer y mayor punto de fractura (nodo superior) parte en dos a los clientes basándose en sus ingresos brutos anuales, escindiendo el gasto en dos reinos. En el brazo derecho (altos ingresos), el modelo consulta cuántos hijos se tiene (nodo `Children_Home`) para coronar a los ganadores (alta renta y 0 niños) con un ticket disparado a 1448 €.
 
 ### 6.2. Importancia de las variables
 
@@ -607,7 +696,9 @@ cat("Gasto medio real:", round(mean(data_modelo$Total_Spending), 2), "€\n")
 cat("Error relativo (RMSE / media):", round(rmse / mean(data_modelo$Total_Spending) * 100, 1), "%\n")
 ```
 
-> **Hallazgo clave — Análisis 6 (Pregunta extra):** El árbol de decisión confirma que **Income** es la variable predictora más importante del gasto total, seguida del número de menores en el hogar (Kidhome, Teenhome, Children_Home_num). El estado civil tiene una importancia secundaria. La combinación de ingresos altos y ausencia de hijos define el segmento de mayor gasto, mientras que bajos ingresos con varios hijos caracterizan al cliente de menor facturación. El modelo alcanza un R² razonable para datos de comportamiento de consumo, validando la relevancia conjunta de estas variables.
+::: insight-box
+**Hallazgo clave — Análisis 6:** El árbol de decisión confirma que **Income** es la variable predictora más importante del gasto total, seguida del número de menores en el hogar. El estado civil tiene una importancia secundaria. La c**ombinación de ingresos altos y ausencia de hijos** define el **segmento de mayor gasto**, mientras que bajos ingresos con varios hijos caracterizan al cliente de menor facturación. El modelo alcanza un R² razonable para datos de comportamiento de consumo, validando la relevancia conjunta de estas variables.
+:::
 
 ## Conclusiones
 
@@ -625,13 +716,12 @@ Tras el análisis realizado mediante tests no paramétricos, correlaciones y un 
 
 **6. Income y la presencia de hijos son los factores más determinantes.** El árbol de decisión identifica los ingresos y el número de menores como las variables con mayor capacidad predictiva del gasto total. La combinación de altos ingresos y ausencia de hijos define al segmento de mayor gasto, mientras que bajos ingresos con múltiples hijos corresponden al segmento de menor gasto.
 
-### Implicaciones empresariales
+### Implicaciones empresariales tácticas
 
-Desde una perspectiva de *Customer Analytics*, estos resultados sugieren:
+Desde una perspectiva de *Customer Analytics* aplicada al impacto directo en negocio y ROI de la compañía, estas evidencias exigen reorientar la ejecución del marketing:
 
--   **Segmentación**: Los hogares sin hijos con ingresos medios-altos representan el segmento de mayor valor. Las campañas dirigidas a este grupo deberían enfatizar productos *premium* (vino, carne).
--   **Personalización**: Para hogares con hijos, conviene adaptar las ofertas hacia productos de primera necesidad o packs familiares que se ajusten a su redistribución presupuestaria.
--   **Retención**: Los clientes con hijos, aunque gastan menos por transacción, pueden representar un valor a largo plazo si se diseñan programas de fidelización adaptados a su ciclo vital familiar.
+-   **Segmentación Golden:** Los hogares sin hijos con ingresos medios-altos (nuestro segmento Pareto) deben absorber el presupuesto premium de captación y retención. El catálogo de alto margen (carnes maduradas, bodegas especiales) es altamente susceptible de cruces con estas siluetas sociodemográficas.
+-   **Rotación en Familias:** La merma de capacidad predictiva de ingresos en el bloque de familias obliga a pivotar las campañas en este clúster hacia los *basics*. A nivel de negocio, es imperativo rediseñar *packs de volumen* (compras conjuntas) para inyectar liquidez y fidelidad a este nicho.
 
 ## 7. Reflexión estratégica del modelo de negocio
 

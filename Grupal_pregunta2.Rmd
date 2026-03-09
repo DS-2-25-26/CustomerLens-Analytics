@@ -1,12 +1,13 @@
 ---
-title: "CustomerLens-Analytics. Grupo 2."
-author: "Jaime Linares Barrera, Andrés Martínez Reviriego, Pablo Oliva Muñoz y Francisco Javier Ruiz Rodríguez "
+title: "CustomerLens-Analytics"
+subtitle: "El dinero no da la felicidad, pero sí más productos en la cesta, ¿o quizás no?"
+author: "Jaime Linares, Andrés Martínez, Pablo Oliva y Francisco Javier Ruiz | Grupo 2"
 output:
   html_document:
+    theme: flatly
     toc: true
     toc_float: true
     toc_depth: 4
-    # number_sections: true
 editor_options: 
   markdown: 
     wrap: sentence
@@ -17,19 +18,83 @@ editor_options:
 body {
   text-align: justify;
 }
+.insight-box {
+  background-color: #f0fdf4;
+  border-left: 5px solid #22c55e;
+  padding: 15px;
+  margin: 20px 0;
+  border-radius: 4px;
+  color: #166534;
+  font-size: 0.95em;
+}
 </style>
 ```
 
-# Dime cuánto ganas y te diré qué compras
+```{=html}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
+
+#header {
+    margin-top: 40px;
+    margin-bottom: 40px;
+    padding: 80px 20px;
+    /* Degradado de azul profundo a azul profesional */
+    background: linear-gradient(135deg, #000428 0%, #004e92 100%);
+    color: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 78, 146, 0.3);
+    text-align: center;
+    font-family: 'Inter', sans-serif;
+}
+
+h1.title {
+    font-weight: 800;
+    font-size: 3.8em;
+    letter-spacing: -2px;
+    margin-bottom: 15px;
+    color: #ffffff;
+}
+
+.subtitle {
+    font-size: 1.6em;
+    font-weight: 400;
+    opacity: 0.95;
+    margin-bottom: 25px;
+    color: #e0e0e0;
+}
+
+h4.author {
+    font-weight: 400;
+    font-size: 1.1em;
+    margin-top: 30px;
+    color: #ffffff;
+    opacity: 0.8;
+}
+
+h4.date {
+    font-size: 0.9em;
+    font-weight: 300;
+    margin-top: 10px;
+    color: #abdbe3;
+}
+
+/* Personalización del menú lateral (TOC) para que no desentone */
+.list-group-item.active, .list-group-item.active:focus, .list-group-item.active:hover {
+    background-color: #004e92;
+    border-color: #004e92;
+    font-weight: bold;
+}
+</style>
+```
 
 ## Contextualización y motivación
 
-Cuando hablamos de comportamiento de compra, no solo importa **cuánto** gasta un cliente, sino también **qué tan variada** es su cesta.
-Un cliente que gasta 500 € repartidos en 6 categorías de producto presenta un perfil muy distinto de otro que concentra el mismo importe en una sola categoría.
-La **diversidad de la cesta** es un indicador clave tanto de la propensión al *cross-selling* como del nivel de exploración del catálogo por parte del consumidor.
+Cuando hablamos de comportamiento de compra orientado a maximizar la **Rentabilidad por Cliente** y mejorar el Retorno de Inversión (ROI) promocional, no solo importa **cuánto** gasta un cliente, sino también **qué tan variada** es su cesta.
+Un cliente que gasta 500 € repartidos en 6 categorías de producto presenta un perfil de fidelización sistémica, frente a otro que concentra el riesgo de abandono en una sola categoría.
 
-En notebooks anteriores se ha analizado en profundidad la relación entre ingresos y gasto total (véase *Anatomía del cliente de alto valor*), así como la distribución del gasto por categoría en función de la estructura familiar (véase *Dime con quién vives y te diré qué compras*).
-En este notebook nos planteamos una pregunta complementaria que **no se ha abordado hasta ahora en el proyecto**:
+La **diversidad de la cesta** es un indicador clave tanto de la propensión al *cross-selling* como del nivel de exploración del catálogo (anchura de compra) por parte del consumidor.
+
+En este notebook nos planteamos la siguiente pregunta core orientada a negocio:
 
 > **¿El nivel de ingresos influye en la diversidad y/o cantidad de productos comprados?**
 
@@ -187,6 +252,10 @@ ggplot(data, aes(x = Income_Group, y = Product_Diversity, fill = Income_Group)) 
     )
 ```
 
+**Interpretación:** Al observar estos diagramas de violín y cajas agrupados por decil de renta, el escalado ascendente salta a la vista.
+En el cuartil inferior (Q1, rojo), el grueso de clientes se concentra entre 1 y 3 categorías de producto.
+A medida que avanzamos hacia Q4 (azul oscuro), la forma del violín se invierte: su masa plástica asciende hasta apelotonarse en el extremo superior (6 categorías), logrando que casi desaparezcan del mapa los clientes de rentas altas con cestas monotemáticas.
+
 ### 1.3. ¿Qué proporción de clientes compra en todas las categorías?
 
 ```{r fig.width=10, fig.height=5}
@@ -219,6 +288,9 @@ ggplotly(p_div_dist, tooltip = "text") %>%
     layout(margin = list(t = 80, b = 80, l = 80, r = 80))
 ```
 
+**Interpretación:** Este gráfico de barras apiladas porcentualmente refuerza la imagen previa aportando precisión.
+La barra correspondiente a "6 categorías" domina por completo en el segmento Q4 (azul oscuro), mientras que en el Q1 (rojo) la distribución se esparce, dando un protagonismo casi equivalente a cestas de 1, 2, 3 y 4 tipologías de artículos.
+
 ### 1.4. Tests estadísticos
 
 ```{r warning=FALSE}
@@ -238,9 +310,11 @@ library(dunn.test)
 dunn_diversity <- dunn.test(data$Product_Diversity, data$Income_Group, method = "bonferroni")
 ```
 
-**Interpretación**: La correlación de Spearman mide la asociación monotónica entre ingresos y diversidad.
-El test de Kruskal-Wallis evalúa si los cuatro grupos de ingresos presentan niveles de diversidad significativamente distintos.
-Las comparaciones de Dunn identifican qué pares concretos de grupos difieren entre sí.
+::: insight-box
+**Hallazgo clave — Análisis 1:** La correlación de Spearman confirma una fuerte asociación monotónica entre ingresos y diversidad.
+El test de Kruskal-Wallis avala de forma robusta que a mayor cuartil de renta, mayor amplitud de cesta.
+Las comparaciones de Dunn sellan escalonamientos estadísticamente significativos (las carteras más potentes rozan la omnicanalidad del catálogo).
+:::
 
 ## Análisis 2: Curva de diversificación — ¿Existe un punto de saturación?
 
@@ -271,6 +345,10 @@ ggplot(data, aes(x = Income, y = Product_Diversity)) +
         legend.position = "top"
     )
 ```
+
+**Interpretación:** La nube de puntos con la superposición de la curva LOESS (suavizado no paramétrico) muestra el recorrido natural del consumo.
+Al arrancar en rentas de 0 a 25.000€, la línea trepa empinada asimilando variedad rápidamente (fase de "descubrimiento").
+Cumplidos los 60.000-70.000€, observamos claramente cómo la trenza gris frena en seco su escalada.
 
 ### 2.2. Diversidad media por decil de ingresos
 
@@ -314,6 +392,12 @@ ggplotly(p_div_decil, tooltip = "text") %>%
 ```{r}
 print(div_decil %>% select(Income_Decile, income_medio, diversidad_media, pct_6_cat), n = 10)
 ```
+
+::: insight-box
+**Hallazgo clave — Análisis 2:** La curva empírica destapa un insight millonario: **sí existe un punto de saturación**.
+A partir del decil 6-7 (rentas trenzando en torno a 60K-70K), la plataforma toca techo (promedio de 5.8 categorías).
+Seguir invirtiendo presupuesto de incentivo de *descubrimiento* en esos cohortes altos sería ineficiente.
+:::
 
 ## Análisis 3: Tasa de activación por categoría — ¿Qué se «enciende» primero?
 
@@ -393,8 +477,10 @@ activacion_extremos <- activacion %>%
 activacion_extremos
 ```
 
-**Interpretación**: Las categorías con mayor incremento entre el decil 1 y el decil 10 son las más sensibles al nivel de ingresos.
-Aquellas con tasa de activación alta incluso en el decil más bajo representan necesidades más «básicas» o universales del catálogo.
+::: insight-box
+**Hallazgo clave — Análisis 3:** Vino y carnes actúan como anclas (se encienden casi por defecto), mientras que fruta, dulces o el propio oro presentan latencias elásticas dictadas por el salario mensual disponible.
+Esta jerarquía confirma que la plataforma prioriza la captación mediante hedonismo, activando los caprichos menores solo a rebufo del confort económico.
+:::
 
 ## Análisis 4: Entropía de Shannon — ¿Gasto equitativo o concentrado?
 
@@ -497,6 +583,11 @@ ggplot(entropy_decil, aes(x = Income_Decile, y = entropy_media)) +
     theme(plot.title = element_text(face = "bold"))
 ```
 
+::: insight-box
+**Hallazgo clave — Análisis 4:** Los tests estadísticos (Spearman y Kruskal-Wallis) avalan sólidamente este patrón visomotriz: el aumento de ingresos empuja la entropía de Shannon hacia arriba.
+Con rentas altas, el cliente no solo dispone de más presupuesto o toca más categorías, sino que balancea equitativamente su ticket entre ellas, reduciendo drásticamente la dependencia extrema hacia un solo tipo de producto.
+:::
+
 ## Análisis 5: ¿Más ingresos implican más compras?
 
 Más allá de la diversidad (en qué categorías se compra), la **cantidad total de compras** es otro indicador relevante de la intensidad de la relación del cliente con la empresa.
@@ -548,6 +639,11 @@ cat("  p-valor =", format.pval(cor_income_purchases$p.value, digits = 3), "\n\n"
 kruskal_purchases <- kruskal.test(Total_Purchases ~ Income_Group, data = data)
 kruskal_purchases
 ```
+
+::: insight-box
+**Hallazgo clave — Análisis 5:** El número de compras reporta un crecimiento robusto y estadísticamente significativo a medida que aumenta el nivel salarial.
+El mayor poder adquisitivo no solo incentiva a explorar más categorías en el catálogo, sino que eleva drásticamente la frecuencia absoluta de transacciones por cliente.
+:::
 
 ## Análisis 6: Resumen de correlaciones clave
 
@@ -611,6 +707,11 @@ ggplotly(p_cor, tooltip = "text") %>%
     layout(margin = list(t = 80, b = 80, l = 80, r = 80))
 ```
 
+::: insight-box
+**Hallazgo clave — Análisis 6:** El nivel de ingresos es un predictor crítico de la **frecuencia de compra** ($\rho = 0.78$), confirmando que a mayor renta el cliente vuelve con mucha más asiduidad.
+Sin embargo, la relación con la estructura de la cesta es más compleja: aunque tocan un número ligeramente mayor de categorías ($\rho = 0.21$), la **Entropía de Shannon negativa** ($\rho = -0.23$) sugiere que estos clientes Premium tienden a especializar su gasto, concentrándose en nichos específicos de alto valor en lugar de dispersar su presupuesto de forma aleatoria.
+:::
+
 ## Análisis 7 (Pregunta extra): ¿Qué predice la diversidad de la cesta?
 
 Para determinar qué factores socioeconómicos tienen mayor peso en la diversificación del gasto, construimos un **árbol de decisión** que predice `Product_Diversity` a partir de variables de perfil.
@@ -643,6 +744,9 @@ rpart.plot(tree_model,
     cex = 0.8
 )
 ```
+
+**Interpretación visual del árbol:** Leído de arriba hacia la caída de hojas, este árbol entroniza de nuevo al factor monetario (`Income` \< 51e3) como el primer y gran discriminador ciego para diagnosticar si alguien comprará pocos o muchos tipos de artículo.
+Sorprendentemente, tras depurar su renta, el árbol interroga (no sobre el marketing o canal) sino sobre el número de niños en el hogar (`Children_Home_num`), castigando a las familias con bolsillos ajustados frente al idílico perfil de alto poder adquisitivo sin importar su condición social o de soltería.
 
 ### 7.3. Importancia de las variables
 
@@ -688,6 +792,11 @@ cat("Diversidad media real:", round(mean(data_modelo$Product_Diversity), 2), "ca
 cat("Error relativo (RMSE / media):", round(rmse / mean(data_modelo$Product_Diversity) * 100, 1), "%\n")
 ```
 
+::: insight-box
+**Hallazgo clave — Análisis 7:** Tanto la bifurcación inicial del árbol como el score de importancia relativa coronan al nivel económico (`Income`) como el motor indiscutible de la diversificación.
+Tras su estela, la presencia de menores en el hogar constriñe fuertemente el abanico de categorías adquiridas, castigando la exploración a favor de consumos obligatorios, frente a un perfil sin hijos con más margen para el capricho.
+:::
+
 ## Conclusiones
 
 Tras analizar la diversidad de la cesta de compra desde múltiples perspectivas —amplitud (nº de categorías), homogeneidad (entropía de Shannon), intensidad (nº de compras), curvas de saturación y modelado predictivo—, extraemos las siguientes conclusiones:
@@ -712,14 +821,13 @@ Los clientes de mayor poder adquisitivo no solo diversifican más, sino que tamb
 **6. (Pregunta extra) Los ingresos son el factor más determinante de la diversidad.** El árbol de decisión confirma que `Income` es la variable de mayor importancia para predecir cuántas categorías compra un cliente, por encima de la edad, la estructura familiar o el nivel educativo.
 La estructura del árbol revela perfiles accionables: los clientes con ingresos por debajo de cierto umbral y con hijos presentan la menor diversidad, mientras que los de ingresos altos diversifican independientemente de otras variables.
 
-### Implicaciones empresariales
+### Implicaciones empresariales tácticas y Next Steps
 
-Desde una perspectiva de *Customer Analytics*, estos resultados sugieren estrategias diferenciadas:
+Desde una perspectiva avanzada de *Customer Analytics* orientada a maximizar el Lifetime Value (CLV), proactivamos las siguientes rutas:
 
--   **Cross-selling progresivo**: para clientes de ingresos medios que aún no compran en todas las categorías, las campañas deberían promover las categorías que se activan más tarde en la jerarquía (fruta, pescado, oro). Ofrecer descuentos de primer compra en estas categorías podría acelerar la diversificación.
--   **Equilibrio de cesta en gama alta**: los clientes de ingresos altos ya compran en todas las categorías, pero la entropía indica que aún pueden existir categorías infrarepresentadas en su cesta. Las recomendaciones personalizadas deberían orientarse a equilibrar su gasto, no a añadir categorías.
--   **Focalización en gama baja**: los clientes de menor renta concentran su gasto en pocas categorías. Las estrategias para este segmento deberían priorizar la **retención y el ticket** dentro de las categorías que ya consumen, en lugar de intentar diversificar su cesta.
--   **Umbral de saturación como criterio de segmentación**: el punto de inflexión de la curva de diversificación (\~decil 6–7) puede servir como umbral para diferenciar segmentos con potencial de crecimiento en variedad frente a segmentos ya saturados.
+-   **Algoritmia de Cross-selling escalonada:** No debemos disparar sugerencias aleatorias. Sabiendo la jerarquía (vino-\>carne-\>...-\>oro), los motores de recomendación deben empujar a los clientes que acaban de cruzar la frontera Q2, la próxima categoría biológicamente esperada, elevando su ticket sin causar fricción intrusiva.
+-   **Ahorro de Incentivos (Punto de Saturación):** El hallazgo técnico bandera de la saturación en el decil 7 revela ineficiencias de marketing. Entregar cupones multidimensionales a las clases altas roza el despilfarro: ya nos compran todo el catálogo. Su *engagement* transcurrirá mediante fidelización y experiencias, no mediante descuentos transversales de ampliación.
+-   **NEXT STEP - Clustering Jerárquico por Cestas:** Sugerimos al equipo transitar en la próxima iteración del proyecto a ensamblar modelos no supervisados (*K-Means* o algoritmos genéticos). En lugar de empujar mediante reglas fijas, modelar una agrupación por "cestas espejo" cimentada sobre `Shannon_Entropy` nos entregará sub-poblaciones prediseñadas para abatir stock remanente hiper-específico (la llamada *"long-tail"*).
 
 ## Referencias
 
