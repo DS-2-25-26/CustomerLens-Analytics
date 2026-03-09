@@ -1,5 +1,6 @@
 ---
 title: "CustomerLens-Analytics: Preguntas Individuales"
+subtitle: "Descuentos: ¿Fidelizar o Malacostumbrar?"
 author: "Andrés Martínez Reviriego"
 output:
   html_document:
@@ -12,8 +13,94 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-# Configuración global de chunks para ocultar warnings y mensajes por defecto
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = 'center')
+```
+
+```{=html}
+<style>
+body {
+  text-align: justify;
+}
+.insight-box {
+  background-color: #fff8f0;
+  border-left: 5px solid #e67e22;
+  padding: 15px;
+  margin: 20px 0;
+  border-radius: 4px;
+  color: #7d4300;
+  font-size: 1.1em;
+}
+
+.section-divider h1,
+h1 {
+  background: linear-gradient(90deg, #7d3c00 0%, #c0392b 100%);
+  color: #ffffff !important;
+  padding: 18px 28px;
+  border-radius: 10px;
+  margin-top: 50px;
+  margin-bottom: 25px;
+  font-family: 'Inter', sans-serif;
+  font-size: 1.6em;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  box-shadow: 0 4px 15px rgba(125, 60, 0, 0.25);
+}
+</style>
+```
+
+```{=html}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
+
+#header {
+    margin-top: 40px;
+    margin-bottom: 40px;
+    padding: 80px 20px;
+    background: linear-gradient(135deg, #1a0a00 0%, #7d3c00 60%, #c0392b 100%);
+    color: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(125, 60, 0, 0.35);
+    text-align: center;
+    font-family: 'Inter', sans-serif;
+}
+
+h1.title {
+    font-weight: 800;
+    font-size: 3.8em;
+    letter-spacing: -2px;
+    margin-bottom: 15px;
+    color: #ffffff;
+}
+
+.subtitle {
+    font-size: 1.6em;
+    font-weight: 400;
+    opacity: 0.95;
+    margin-bottom: 25px;
+    color: #f0d0b0;
+}
+
+h4.author {
+    font-weight: 400;
+    font-size: 1.1em;
+    margin-top: 30px;
+    color: #ffffff;
+    opacity: 0.8;
+}
+
+h4.date {
+    font-size: 0.9em;
+    font-weight: 300;
+    margin-top: 10px;
+    color: #f5c29a;
+}
+
+.list-group-item.active, .list-group-item.active:focus, .list-group-item.active:hover {
+    background-color: #7d3c00;
+    border-color: #7d3c00;
+    font-weight: bold;
+}
+</style>
 ```
 
 # Pregunta 1: ¿Son los descuentos rentables o provocan pérdidas?
@@ -727,5 +814,16 @@ La exploración de datos y la aplicación del algoritmo Apriori han confirmado y
 
 Con esta aproximación visual, obtenemos una radiografía de consumo que complementa perfectamente la regresión de la Pregunta 1. La conclusión final que extraemos de ambas preguntas es la necesidad crítica de analizar no solo los descuentos que se ofrecen, sino muy especialmente el perfil y comportamiento de los clientes que los utilizan para poder ajustar los descuentos de manera más eficiente.
 
+## Referencias
 
+*Pregunta 1 — Rentabilidad de los descuentos*
 
+- Mela, C. F., Gupta, S., & Lehmann, D. R. (1997). The long-term impact of promotion and advertising on consumer brand choice. **Journal of Marketing Research**, 34(2), 248–261. [https://doi.org/10.2307/3151862](https://doi.org/10.2307/3151862)
+
+- Ren, X., Li, M., & Liu, Y. (2021). Social Marketing of Electronic Coupons Under the Perspective of Social Sharing Behavior. Frontiers in Psychology, 12, 746928. [https://doi.org/10.3389/fpsyg.2021.746928](https://doi.org/10.3389/fpsyg.2021.746928)
+
+*Pregunta 2 — Patrones en el mix de productos*
+
+- Raorane, A. A., & Kulkarni, R. V. (2011). Data mining techniques: A source for consumer behavior analysis. **International Journal of Database Management Systems**, 3(3), 45-56. [https://doi.org/10.5121/ijdms.2011.3304](https://doi.org/10.5121/ijdms.2011.3304)
+
+- Agrawal, R., Imielinski, T., & Swami, A. (1993). Mining association rules between sets of items in large databases. **ACM SIGMOD Record**, 22(2), 207-216. [https://doi.org/10.1145/170036.170072](https://doi.org/10.1145/170036.170072)
