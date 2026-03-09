@@ -1,12 +1,13 @@
 ---
-title: "CustomerLens-Analytics. Grupo 2."
-author: "Jaime Linares Barrera, Andrés Martínez Reviriego, Pablo Oliva Muñoz y Francisco Javier Ruiz Rodríguez "
+title: "CustomerLens-Analytics"
+subtitle: "La vida son etapas… ¿y el carrito también?"
+author: "Jaime Linares, Andrés Martínez, Pablo Oliva y Francisco Javier Ruiz | Grupo 2"
 output:
   html_document:
+    theme: flatly
     toc: true
     toc_float: true
     toc_depth: 4
-    # number_sections: true
 ---
 
 ```{=html}
@@ -14,16 +15,78 @@ output:
 body {
   text-align: justify;
 }
+.insight-box {
+  background-color: #f0fdf4;
+  border-left: 5px solid #22c55e;
+  padding: 15px;
+  margin: 20px 0;
+  border-radius: 4px;
+  color: #166534;
+  font-size: 1.05em;
+}
 </style>
 ```
 
-# Dime cuántos años tienes y te diré qué compras
+```{=html}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
+
+#header {
+    margin-top: 40px;
+    margin-bottom: 40px;
+    padding: 80px 20px;
+    /* Degradado de azul profundo a azul profesional */
+    background: linear-gradient(135deg, #000428 0%, #004e92 100%);
+    color: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 78, 146, 0.3);
+    text-align: center;
+    font-family: 'Inter', sans-serif;
+}
+
+h1.title {
+    font-weight: 800;
+    font-size: 3.8em;
+    letter-spacing: -2px;
+    margin-bottom: 15px;
+    color: #ffffff;
+}
+
+.subtitle {
+    font-size: 1.6em;
+    font-weight: 400;
+    opacity: 0.95;
+    margin-bottom: 25px;
+    color: #e0e0e0;
+}
+
+h4.author {
+    font-weight: 400;
+    font-size: 1.1em;
+    margin-top: 30px;
+    color: #ffffff;
+    opacity: 0.8;
+}
+
+h4.date {
+    font-size: 0.9em;
+    font-weight: 300;
+    margin-top: 10px;
+    color: #abdbe3;
+}
+
+/* Personalización del menú lateral (TOC) para que no desentone */
+.list-group-item.active, .list-group-item.active:focus, .list-group-item.active:hover {
+    background-color: #004e92;
+    border-color: #004e92;
+    font-weight: bold;
+}
+</style>
+```
 
 ## Contextualización y motivación
 
 La edad es uno de los factores sociodemográficos más estudiados en *Consumer Behaviour*. A lo largo del ciclo vital, los hábitos alimentarios, las preferencias de producto y la disposición al gasto evolucionan de forma notable. En este notebook analizamos si la **edad del cliente** está asociada a diferencias significativas en el **tipo de producto que consume**, más allá del volumen total de gasto.
-
-En notebooks anteriores se ha estudiado cómo la estructura familiar (presencia de hijos) y el nivel de ingresos influyen en el comportamiento de compra. En este caso, la pregunta es distinta: ¿compran productos diferentes los clientes jóvenes y los clientes mayores, incluso controlando por el gasto total?
 
 A partir de la pregunta principal se derivan las siguientes subpreguntas:
 
@@ -119,7 +182,7 @@ stats_edad <- data %>%
 stats_edad
 ```
 
-El grupo senior (>65) presenta el mayor gasto medio (954 €) y la mayor mediana (1.016 €), aunque con una muestra reducida (n = 76). El grupo pre-senior (51–65) ocupa el segundo lugar en mediana (578 €). Jóvenes y adultos tienen medias similares (~550–564 €), pero el grupo joven muestra una asimetría especialmente pronunciada: su mediana (170 €) está muy por debajo de su media, lo que indica que la mayoría gasta poco pero una minoría gasta mucho. En adultos la mediana sube a 308 €, con menor dispersión relativa.
+**Interpretación:** El grupo senior (\>65) presenta el mayor gasto medio (954 €) y la mayor mediana (1.016 €), aunque con una muestra reducida (n = 76). El grupo pre-senior (51–65) ocupa el segundo lugar en mediana (578 €). Jóvenes y adultos tienen medias similares (\~550–564 €), pero el grupo joven muestra una asimetría especialmente pronunciada: su mediana (170 €) está muy por debajo de su media, lo que indica que la mayoría gasta poco pero una minoría gasta mucho. En adultos la mediana sube a 308 €, con menor dispersión relativa.
 
 ### 1.2. Visualización: distribución del gasto total por grupo de edad
 
@@ -141,7 +204,7 @@ ggplot(data, aes(x = Age_Group, y = Total_Spending, fill = Age_Group)) +
     )
 ```
 
-La forma del violín delata la distribución interna de cada grupo. En **jóvenes y adultos** el violín se ensancha notablemente en la parte baja, señal de que la mayoría de clientes concentra su gasto cerca de cero —o muy por debajo de la media—, con una cola superior larga que eleva la media artificialmente. En el grupo **Pre-senior** la distribución se equilibra: el violín es más simétrico y la mediana se aproxima a la media (ambas en torno a los 600 €). El grupo **senior** presenta la caja más compacta y elevada del conjunto, con poca dispersión relativa y la mediana más alta (1.016 €), aunque su tamaño muestral reducido (n = 76) aconseja interpretar este resultado con cautela.
+**Interpretación:** En **jóvenes y adultos** el violín se ensancha notablemente en la parte baja, señal de que la mayoría de clientes concentra su gasto cerca de cero —o muy por debajo de la media—, con una cola superior larga que eleva la media artificialmente. En el grupo **Pre-senior** la distribución se equilibra: el violín es más simétrico y la mediana se aproxima a la media (ambas en torno a los 600 €). El grupo **senior** presenta la caja más compacta y elevada del conjunto, con poca dispersión relativa y la mediana más alta.
 
 ### 1.3. Test estadístico: Kruskal-Wallis
 
@@ -152,7 +215,7 @@ kruskal_edad <- kruskal.test(Total_Spending ~ Age_Group, data = data)
 kruskal_edad
 ```
 
-Con χ² = 65,93 y p < 0,001, rechazamos la hipótesis nula de que todos los grupos de edad presentan la misma distribución de gasto. Existe evidencia estadística sólida de que al menos un grupo de edad difiere significativamente en su nivel de gasto total.
+**Interpretación:** Con χ² = 65,93 y p \< 0,001, rechazamos la hipótesis nula de que todos los grupos de edad presentan la misma distribución de gasto. Existe evidencia estadística sólida de que al menos un grupo de edad difiere significativamente en su nivel de gasto total.
 
 ### 1.4. Comparaciones post-hoc: Test de Dunn
 
@@ -165,7 +228,10 @@ library(dunn.test)
 dunn_edad <- dunn.test(data$Total_Spending, data$Age_Group, method = "bonferroni")
 ```
 
-El gasto total varía significativamente entre grupos de edad (Kruskal-Wallis, χ² = 65,93; p < 0,001). Los clientes seniors (>65) presentan el mayor gasto medio (954 €) y la mediana más alta (1.016 €), seguidos del grupo pre-senior (51–65, mediana: 578 €). El test de Dunn revela que jóvenes y adultos no se diferencian significativamente entre sí (p = 1,00), pero ambos difieren de forma robusta de pre-seniors y seniors. El mayor salto en gasto se produce a partir de los 51 años.
+::: insight-box
+**Hallazgo clave — Análisis 1:** A mayor edad, mayor gasto total, pero de forma escalonada. El salto principal no ocurre entre la juventud y la madurez temprana, sino a partir de los 51 años (pre-seniors), coronándose con el segmento senior que, aun siendo el más pequeño en volumen, exhibe con creces el ticket más robusto de la plataforma.
+:::
+
 
 ## Análisis 2: Distribución del gasto por categoría de producto
 
@@ -190,7 +256,7 @@ gasto_categorias <- data %>%
 gasto_categorias
 ```
 
-El vino es la categoría de mayor gasto en todos los grupos de edad. Destaca que el grupo joven destina más a carne (182 €) que el adulto (147 €), un patrón contraintuitivo que apunta a una mayor heterogeneidad del segmento joven. El grupo senior es el que mayor gasto registra en vino (488 €), mientras que las categorías de menor ticket (fruta, dulces) permanecen prácticamente estables en todos los grupos.
+**Interpretación**: El vino es la categoría de mayor gasto en todos los grupos de edad. Destaca que el grupo joven destina más a carne (182 €) que el adulto (147 €), un patrón contraintuitivo que apunta a una mayor heterogeneidad del segmento joven. El grupo senior es el que mayor gasto registra en vino (488 €), mientras que las categorías de menor ticket (fruta, dulces) permanecen prácticamente estables en todos los grupos.
 
 ### 2.2. Visualización: gasto medio por categoría
 
@@ -213,7 +279,7 @@ ggplot(gasto_categorias, aes(x = Age_Group, y = Gasto_Medio, fill = Age_Group)) 
     )
 ```
 
-El gráfico de barras facetado revela patrones distintos según la categoría. El **vino** es el que presenta la evolución más clara y monótona: las barras crecen de izquierda a derecha en todos los grupos, desde 243 € en jóvenes hasta 488 € en seniors. La **carne** muestra un patrón diferente: el grupo adulto registra el valor más bajo (~147 €), inferior incluso al de los jóvenes (~182 €), y la categoría sube de nuevo en pre-seniors y, especialmente, en seniors (~270 €). Las categorías de menor ticket (**fruta, dulces, pescado, oro**) son relativamente estables entre jóvenes, adultos y pre-seniors, pero el grupo senior aparece claramente por encima en todas ellas, sugiriendo que los clientes de mayor edad incrementan el gasto en *todas* las categorías, no solo en las de mayor valor.
+**Interpretación:** El gráfico de barras facetado revela patrones distintos según la categoría. El **vino** es el que presenta la evolución más clara y monótona: las barras crecen de izquierda a derecha en todos los grupos, desde 243 € en jóvenes hasta 488 € en seniors. La **carne** muestra un patrón diferente: el grupo adulto registra el valor más bajo (\~147 €), inferior incluso al de los jóvenes (\~182 €), y la categoría sube de nuevo en pre-seniors y, especialmente, en seniors (\~270 €). Las categorías de menor ticket (**fruta, dulces, pescado, oro**) son relativamente estables entre jóvenes, adultos y pre-seniors, pero el grupo senior aparece claramente por encima en todas ellas, sugiriendo que los clientes de mayor edad incrementan el gasto en *todas* las categorías, no solo en las de mayor valor.
 
 ### 2.3. Proporción relativa del gasto por categoría (mix de producto)
 
@@ -251,7 +317,6 @@ ggplot(proporciones, aes(x = Age_Group, y = Proporcion, fill = Categoria)) +
     )
 ```
 
-El gráfico de barras apiladas muestra con claridad que el **vino** (segmento inferior, color vino oscuro) es la categoría con mayor peso en todos los grupos, pero su protagonismo crece visiblemente de jóvenes a pre-seniors. En el grupo joven, la **carne** (segmento superior, rojo) ocupa una parte considerable del mix —mayor que en el grupo adulto—, lo que refuerza el patrón visto en la sección anterior. A partir del grupo pre-senior, la proporción de vino se estabiliza en torno al 51–53 %, mientras que el resto de las categorías (fruta verde, dulces naranja, pescado azul, oro amarillo) ocupan franjas similares y relativamente constantes en todos los grupos.
 
 ### 2.4. Tests estadísticos por categoría
 
@@ -282,7 +347,9 @@ for (i in seq_along(categorias)) {
 resultados_kruskal
 ```
 
-El mix de producto varía significativamente con la edad en la mayoría de categorías (Kruskal-Wallis, p < 0,05). El vino y la carne presentan las diferencias absolutas más pronunciadas, con un patrón creciente hacia los grupos de mayor edad. En cambio, categorías como la fruta y los dulces muestran diferencias más moderadas. El grupo pre-senior (51–65) destaca como el de mayor gasto en prácticamente todas las categorías, lo que lo convierte en el segmento de mayor valor en esta plataforma.
+::: insight-box
+**Hallazgo clave — Análisis 2:** La edad redistribuye el presupuesto hacia lo premium. Mientras que categorías como dulces o pescado varían poco (en términos absolutos), el Vino experimenta un aumento espectacular con los años. De manera curiosa, la Carne arranca fuerte en la juventud, cae en la adultez temprana (donde dominan los mayores gastos familiares o la hipoteca) y reflorece al acercarse a la jubilación.
+:::
 
 ## Análisis 3: Curva de evolución del gasto con la edad
 
@@ -290,7 +357,7 @@ El mix de producto varía significativamente con la edad en la mayoría de categ
 
 Más allá de la segmentación por grupos, examinamos la relación continua entre la edad y el gasto en cada categoría mediante **curvas LOESS**, que permiten detectar patrones no lineales y puntos de inflexión.
 
-```{r fig.width=11, fig.height=6}
+```{r fig.width=11, fig.height=6, message=FALSE, warning=FALSE}
 gasto_largo <- data %>%
     select(Age, MntWines, MntFruits, MntMeatProducts,
            MntFishProducts, MntSweetProducts, MntGoldProds) %>%
@@ -317,7 +384,7 @@ ggplot(gasto_largo, aes(x = Age, y = Gasto, color = Categoria)) +
     )
 ```
 
-Las curvas LOESS permiten leer la trayectoria real del gasto a lo largo del ciclo vital. El **vino** (línea oscura, dominante) parte de ~350 € en los clientes más jóvenes (~18 años), desciende hasta un mínimo cercano a los 230 € alrededor de los 38–40 años —la franja de mayor presencia familiar— y luego sube de forma acelerada hasta superar los 500 € a los 70 años, sin señales de saturación. La **carne** (rojo) sigue una trayectoria similar en forma de U: alta en jóvenes, con mínimo en torno a los 175 € hacia los 40 años, y recuperación progresiva en edades avanzadas. Las cuatro categorías restantes (fruta, dulces, pescado, oro) se agrupan en una banda plana muy próxima al eje de cero, prácticamente indistinguibles a esta escala. Los amplios intervalos de confianza en los extremos del eje reflejan la menor cantidad de observaciones en esas franjas de edad.
+**Interpretación:** El **vino**  parte de \~350 € en los clientes más jóvenes (\~18 años), desciende hasta un mínimo cercano a los 230 € alrededor de los 38–40 años —la franja de mayor presencia familiar— y luego sube de forma acelerada hasta superar los 500 € a los 70 años, sin señales de saturación. La **carne** (rojo) sigue una trayectoria similar en forma de U: alta en jóvenes, con mínimo en torno a los 175 € hacia los 40 años, y recuperación progresiva en edades avanzadas. Las cuatro categorías restantes (fruta, dulces, pescado, oro) se agrupan en una banda plana muy próxima al eje de cero, prácticamente indistinguibles a esta escala.
 
 ### 3.2. Gasto medio por decil de edad
 
@@ -359,8 +426,6 @@ ggplot(gasto_decil, aes(x = Age_Decile, y = Gasto_Medio, color = Categoria)) +
     )
 ```
 
-El gráfico de líneas por decil confirma los patrones vistos en la curva LOESS con mayor precisión. La línea del **vino** (oscura) tiene una ligera caída en el decil 3 (edad media: 36,7 años) y luego asciende de forma prácticamente ininterrumpida hasta el decil 10. La línea de la **carne** (rojo) marca el mínimo absoluto en el decil 3 (~129 €) y recupera casi todo lo perdido en el decil 10 (~207 €), trazando una U muy pronunciada. Las cuatro categorías restantes forman un grupo compacto que se mantiene entre 25 y 60 € durante toda la escala.
-
 ```{r}
 gasto_decil %>%
     filter(Categoria %in% c("Vino", "Carne")) %>%
@@ -370,7 +435,9 @@ gasto_decil %>%
     print(n = 10)
 ```
 
-El análisis por deciles revela que el gasto en vino crece de forma prácticamente continua con la edad (de 254 € en el decil 1 a 395 € en el decil 10), sin un pico claro de saturación dentro del rango observado. La carne muestra un perfil más irregular en forma de U: alta en los jóvenes más jóvenes (207 €), desciende en los deciles intermedios (mínimo ~129 €) y se recupera en edades avanzadas (~207 €). Las categorías de menor ticket (fruta, dulces, pescado, oro) permanecen relativamente estables a lo largo del ciclo vital, confirmando que la edad actúa como factor diferenciador principalmente en las categorías de mayor ticket.
+::: insight-box
+**Hallazgo clave — Análisis 3:** Visualizar el gasto cronológicamente destapa dos realidades comerciales clave: existe un extenso "valle de consumo" en la década de los treinta para categorías cárnicas pre-elaboradas, y un crecimiento continuo y sin techo de gasto en la categoría enológica a partir de la pre-jubilación. El vino actúa como motor de escalabilidad constante frente al lastre que suponen las cargas financieras familiares de los adultos medios en el resto de productos.
+:::
 
 ## Análisis 4: Correlaciones entre edad y gasto por categoría
 
@@ -410,8 +477,6 @@ for (i in seq_along(vars_gasto)) {
 resultados_cor
 ```
 
-Solo tres categorías muestran correlación positiva y significativa con la edad: vino (ρ = 0,24), gasto total (ρ = 0,16) y carne (ρ = 0,12). El oro resulta también significativo aunque con ρ = 0,08 (despreciable en magnitud). Fruta (ρ = 0,03), pescado (ρ = 0,03) y dulces (ρ = 0,001) no presentan asociación estadísticamente significativa con la edad (p > 0,05). Todas las correlaciones significativas son de magnitud **débil**, lo que indica que la edad explica solo una fracción modesta de la variabilidad en el gasto.
-
 ### 4.2. Visualización: coeficientes de Spearman
 
 ```{r fig.width=8, fig.height=4}
@@ -438,9 +503,13 @@ ggplot(resultados_cor, aes(x = reorder(Categoria, rho), y = rho,
     )
 ```
 
-El gráfico de barras horizontales muestra de forma visual la jerarquía de correlaciones. El **vino** tiene la barra más larga (ρ = 0,24), confirmando que es la categoría cuyo gasto está más ligado a la edad. El **gasto total** (ρ = 0,16) y la **carne** (ρ = 0,12) se sitúan en segundo y tercer lugar. Las barras de fruta, pescado y dulces son casi imperceptibles y no alcanzan significación estadística. Ninguna barra llega a 0,25, lo que recuerda visualmente que todas las correlaciones son modestas: la edad orienta el consumo hacia el vino, pero no lo determina.
+**Interpretación:** El gráfico de barras horizontales muestra de forma visual la jerarquía de correlaciones. El **vino** tiene la barra más larga (ρ = 0,24), confirmando que es la categoría cuyo gasto está más ligado a la edad. El **gasto total** (ρ = 0,16) y la **carne** (ρ = 0,12) se sitúan en segundo y tercer lugar. Las barras de fruta, pescado y dulces son casi imperceptibles y no alcanzan significación estadística. Ninguna barra llega a 0,25, lo que recuerda visualmente que todas las correlaciones son modestas: la edad orienta el consumo hacia el vino, pero no lo determina.
 
-Las correlaciones de Spearman confirman que la edad tiene una relación positiva y significativa únicamente con vino (ρ = 0,24), gasto total (ρ = 0,16) y carne (ρ = 0,12). Fruta, pescado y dulces no presentan asociación significativa con la edad (p > 0,05). Todas las correlaciones son de magnitud **débil o despreciable**, lo que indica que la edad es un predictor parcial y modesto del nivel de gasto por categoría: influye en la dirección del consumo (más vino con la edad), pero no determina de forma sustancial su magnitud.
+
+::: insight-box
+**Hallazgo clave — Análisis 4:** El factor edad por sí mismo inclina fuertemente las preferencias de la tarjeta de compra hacia el vino y la carne frente al resto de consumos triviales. No obstante, por su baja magnitud estadística, no podemos apoyarnos "ciegamente" en los años cumplidos sin mirar otras variables como el estatus socioeconómico o los hijos.
+:::
+
 
 ## Análisis 5: Heatmap del mix de producto por grupo de edad
 
@@ -485,7 +554,7 @@ ggplot(heatmap_data, aes(x = Age_Group, y = Categoria, fill = Gasto_Zscore)) +
     )
 ```
 
-El heatmap permite identificar de un vistazo los perfiles de consumo diferenciados. La columna **Senior** aparece completamente en rojo intenso: el grupo de mayor edad tiene el mayor z-score en todas y cada una de las seis categorías. La columna **Adulto** presenta los tonos más fríos (azules), especialmente en carne (147 €) y fruta (24 €), que son los mínimos de sus respectivas filas. La fila del **Vino** muestra el gradiente más pronunciado de izquierda a derecha (de azul profundo a rojo intenso), mientras que la fila del **Oro** es la más plana: el pre-senior (50 €) apenas supera al joven (42 €). Los números absolutos en cada celda permiten además comparar magnitudes: el vino del senior (488 €) es el doble del vino del joven (243 €), mientras que fruta o dulces solo difieren en unos 15–20 € entre extremos.
+**Interpretación:** El heatmap permite identificar de un vistazo los perfiles de consumo diferenciados. La columna **Senior** aparece completamente en rojo intenso: el grupo de mayor edad tiene el mayor z-score en todas y cada una de las seis categorías. La columna **Adulto** presenta los tonos más fríos (azules), especialmente en carne (147 €) y fruta (24 €), que son los mínimos de sus respectivas filas. La fila del **Vino** muestra el gradiente más pronunciado de izquierda a derecha (de azul profundo a rojo intenso), mientras que la fila del **Oro** es la más plana: el pre-senior (50 €) apenas supera al joven (42 €). Los números absolutos en cada celda permiten además comparar magnitudes: el vino del senior (488 €) es el doble del vino del joven (243 €), mientras que fruta o dulces solo difieren en unos 15–20 € entre extremos.
 
 ### 5.2. Categoría dominante por grupo de edad
 
@@ -517,8 +586,10 @@ dominante <- data %>%
 
 dominante
 ```
+::: insight-box
+**Hallazgo clave — Análisis 5:** El vino es el motor principal en esta base de clientes (superando el 50% de todo el ticket a partir de la pre-jubilación). Y, aunque en los jóvenes pesa también más del cuarenta por ciento, son precisamente ellos quienes muestran una cesta mucho "más equilibrada", dejando a las rentas más ancianas con una cesta radicalmente dependiente de la madurez y alto costo de los viñedos y cárnicos.
+:::
 
-El heatmap pone de manifiesto un patrón estructural claro: el vino es la categoría dominante en todos los grupos de edad, pero su importancia relativa aumenta con la edad. Los clientes pre-senior y seniors destinan una proporción mayor de su presupuesto al vino, mientras que los jóvenes muestran un perfil más equilibrado entre categorías. La carne ocupa sistemáticamente el segundo lugar en todos los grupos, con mayor presencia en los clientes de mediana edad. Las categorías de bajo ticket (fruta, dulces) son marginales en todos los grupos de edad.
 
 ## Análisis 6 (Pregunta extra): ¿Predice el mix de producto el grupo de edad?
 
@@ -564,7 +635,7 @@ rpart.plot(tree_clasif,
 )
 ```
 
-El árbol usa exclusivamente proporciones de gasto —sin datos de renta ni estructura familiar— y construye 3 niveles de profundidad. La **primera división** separa clientes según si destinan más o menos del 47 % de su presupuesto al vino. En la rama de baja proporción de vino (< 0,47, 52 % de la muestra), el segundo criterio es si esa proporción cae por debajo del 21 %; si además el cliente destina ≥ 24 % a dulces, la hoja predice **Joven (≤35)** con un 64 % de confianza —aunque representa solo el 1 % del total—. En la rama de alta proporción de vino (≥ 0,47, 48 %), el árbol distingue por la proporción de carne; cuando ésta es baja (< 32 %) y la de pescado es alta (≥ 5,9 %), la hoja predice **Pre-senior (51–65)** con un 65 % de confianza (también el 1 % del total). El resto de hojas predicen siempre **Adulto (36–50)**, que es la clase mayoritaria (46 %). El grupo **Senior (>65) no aparece en ninguna hoja**: su mix de proporciones es prácticamente indistinguible del Pre-senior, y con solo 76 observaciones (3,5 %) el árbol no encuentra una partición suficientemente limpia para aislarlo.
+**Interpretación:** El árbol usa exclusivamente proporciones de gasto —sin datos de renta ni estructura familiar— y construye 3 niveles de profundidad. La **primera división** separa clientes según si destinan más o menos del 47 % de su presupuesto al vino. En la rama de baja proporción de vino (\< 0,47, 52 % de la muestra), el segundo criterio es si esa proporción cae por debajo del 21 %; si además el cliente destina ≥ 24 % a dulces, la hoja predice **Joven (≤35)** con un 64 % de confianza —aunque representa solo el 1 % del total—. En la rama de alta proporción de vino (≥ 0,47, 48 %), el árbol distingue por la proporción de carne; cuando ésta es baja (\< 32 %) y la de pescado es alta (≥ 5,9 %), la hoja predice **Pre-senior (51–65)** con un 65 % de confianza (también el 1 % del total). El resto de hojas predicen siempre **Adulto (36–50)**, que es la clase mayoritaria (46 %). El grupo **Senior (\>65) no aparece en ninguna hoja**: su mix de proporciones es prácticamente indistinguible del Pre-senior, y con solo 76 observaciones (3,5 %) el árbol no encuentra una partición suficientemente limpia para aislarlo.
 
 ### 6.2. Importancia de las variables
 
@@ -605,7 +676,6 @@ ggplot(imp_clasif, aes(x = reorder(Variable, Importancia_Rel), y = Importancia_R
     theme(plot.title = element_text(face = "bold"))
 ```
 
-El gráfico de importancia muestra que las seis categorías contribuyen al árbol, pero con pesos muy distintos. El **vino** (31,6 %) destaca claramente como la variable más discriminante —coherente con ser la categoría cuya proporción varía más sistemáticamente con la edad—. A continuación aparecen **pescado** (16,8 %) y **dulces** (15,9 %), que tienen más peso del que sus correlaciones de Spearman (ρ ≈ 0,03) sugerían: en términos de proporciones relativas, estas categorías marcan diferencias entre grupos que el valor absoluto enmascaraba. **Carne** (13,9 %) y **fruta** (12,6 %) completan el rango medio, y el **oro** (9,1 %) es el menos discriminante. La distribución relativamente equilibrada entre categorías indica que no hay un único predictor dominante: el grupo de edad deja huella en *todo* el mix de compra, aunque de forma débil en términos absolutos.
 
 ### 6.3. Evaluación: matriz de confusión
 
@@ -621,30 +691,45 @@ cat("Baseline (clase mayoritaria):", round(baseline * 100, 1), "%\n")
 cat("Mejora sobre el azar:", round((accuracy - baseline) * 100, 1), "puntos porcentuales\n")
 ```
 
-La matriz de confusión muestra que el modelo clasifica correctamente sobre todo el grupo **adulto (36–50)**, que es el más numeroso y por tanto domina las predicciones. Los grupos **joven** y **pre-senior** son parcialmente recuperados en algunos nodos, pero **senior** no aparece como clase predicha en ningún caso, lo que refleja que su mix de proporciones es indistinguible del pre-senior a esta escala. La precisión global supera el baseline del clasificador trivial (que asignaría siempre la clase mayoritaria), confirmando que el patrón de compra aporta información real sobre la edad, aunque limitada.
+**Interpretación:** La matriz de confusión muestra que el modelo clasifica correctamente sobre todo el grupo **adulto (36–50)**, que es el más numeroso y por tanto domina las predicciones. Los grupos **joven** y **pre-senior** son parcialmente recuperados en algunos nodos, pero **senior** no aparece como clase predicha en ningún caso, lo que refleja que su mix de proporciones es indistinguible del pre-senior a esta escala. La precisión global supera el baseline del clasificador trivial (que asignaría siempre la clase mayoritaria), confirmando que el patrón de compra aporta información real sobre la edad, aunque limitada.
+
+::: insight-box
+**Hallazgo clave — Análisis 6:** Si bien la edad nos marca enormes desvíos de consumo (especialmente en vino), pretender utilizar el *«ticket de compra de un cliente»* para adivinar su fecha de nacimiento (*Data Science Inverso*) resulta ineficiente. El algoritmo no consigue segmentar a los ancianos (los confunde con adultos pre-seniors) y su precisión se ve diezmada por el abrumador tamaño de la clase media adulta. Las cestas se parecen demasiado entre sí para usarlas como un simple lector de DNI.
+:::
 
 
 ## Conclusiones
 
 Tras el análisis realizado mediante tests no paramétricos, correlaciones de Spearman y un árbol de clasificación, podemos extraer las siguientes conclusiones:
 
-**1. El gasto total varía significativamente entre grupos de edad.** El test de Kruskal-Wallis (χ² = 65,93; p < 0,001) y las comparaciones de Dunn confirman diferencias robustas entre grupos. Los clientes seniors (>65) son los de mayor gasto medio (954 €) y mediana (1.016 €), seguidos del grupo pre-senior. Jóvenes y adultos no se diferencian estadísticamente entre sí (p = 1,00 en Dunn), pero ambos gastan significativamente menos que pre-seniors y seniors.
+**1. El gasto total varía significativamente entre grupos de edad.** El test de Kruskal-Wallis (χ² = 65,93; p \< 0,001) y las comparaciones de Dunn confirman diferencias robustas entre grupos. Los clientes seniors (\>65) son los de mayor gasto medio (954 €) y mediana (1.016 €), seguidos del grupo pre-senior. Jóvenes y adultos no se diferencian estadísticamente entre sí (p = 1,00 en Dunn), pero ambos gastan significativamente menos que pre-seniors y seniors.
 
-**2. El tipo de producto consumido sí depende de la edad.** Las diferencias en el mix de producto son estadísticamente significativas en las seis categorías (Kruskal-Wallis, p < 0,001 en todas). El vino presenta la mayor chi-cuadrado (114,07), muy por encima de las demás categorías. El vino representa ya el 43 % del gasto de los jóvenes y sube al 51–53 % en los grupos de mayor edad.
+**2. El tipo de producto consumido sí depende de la edad.** Las diferencias en el mix de producto son estadísticamente significativas en las seis categorías (Kruskal-Wallis, p \< 0,001 en todas). El vino presenta la mayor chi-cuadrado (114,07), muy por encima de las demás categorías. El vino representa ya el 43 % del gasto de los jóvenes y sube al 51–53 % en los grupos de mayor edad.
 
 **3. El vino crece de forma continua con la edad; la carne presenta una dip en los años de mayor carga familiar.** Las curvas LOESS muestran que tanto el vino como la carne caen a un mínimo alrededor de los 38–40 años —franja de máxima presencia de hijos en el hogar— y se recuperan con fuerza a partir de los 50. El vino supera los 500 € a los 70 años sin señales de saturación. Esta trayectoria sugiere que el gasto en categorías premium se inhibe durante los años de mayor presencia familiar y se libera cuando los hijos se independizan.
 
-**4. Las correlaciones de Spearman son positivas pero de magnitud débil o despreciable.** Cuatro categorías muestran correlación positiva y significativa con la edad: vino (ρ = 0,24, débil), gasto total (ρ = 0,16, débil), carne (ρ = 0,12, débil) y oro (ρ = 0,08, despreciable). Fruta (ρ = 0,03), pescado (ρ = 0,03) y dulces (ρ = 0,001) no presentan asociación estadísticamente significativa (p > 0,05). En conjunto, la edad explica una fracción modesta de la variabilidad del gasto en valor absoluto.
+**4. Las correlaciones de Spearman son positivas pero de magnitud débil o despreciable.** Cuatro categorías muestran correlación positiva y significativa con la edad: vino (ρ = 0,24, débil), gasto total (ρ = 0,16, débil), carne (ρ = 0,12, débil) y oro (ρ = 0,08, despreciable). Fruta (ρ = 0,03), pescado (ρ = 0,03) y dulces (ρ = 0,001) no presentan asociación estadísticamente significativa (p \> 0,05). En conjunto, la edad explica una fracción modesta de la variabilidad del gasto en valor absoluto.
 
 **5. El vino es la categoría dominante en todos los grupos de edad.** El heatmap confirma que el vino es la mayor partida de gasto en todos los grupos. Su proporción sobre el gasto total es del 43 % en jóvenes, sube hasta el 53,3 % en pre-seniors y se mantiene en el 51,2 % en seniors. Valores absolutos: joven (243 €), adulto (282 €), pre-senior (367 €) y senior (488 €). La carne es la segunda categoría en todos los grupos, con un pronunciado mínimo en adultos (147 €) que se recupera en seniors (273 €).
 
-**6. El mix de producto permite inferir el grupo de edad solo de forma parcial.** El árbol de clasificación, entrenado únicamente sobre proporciones de gasto, construye tres niveles usando vino (31,6 %), pescado (16,8 %), dulces (15,9 %) y carne (13,9 %) como variables más discriminantes. Solo dos combinaciones producen predicciones no mayoritarias: clientes con una proporción de vino < 21 % y de dulces ≥ 24 % se clasifican como **jóvenes** (64 % de confianza); clientes con vino ≥ 47 %, carne < 32 % y pescado ≥ 5,9 % se clasifican como **pre-seniors** (65 % de confianza). En el resto de casos el modelo siempre predice adulto, y el grupo senior nunca se predice porque su perfil es prácticamente idéntico al del pre-senior. La conclusión es clara: la relación entre edad y tipo de producto es estadísticamente real pero no suficientemente fuerte para segmentar grupos de edad a partir del patrón de compra.
+**6. El mix de producto permite inferir el grupo de edad solo de forma parcial.** El árbol de clasificación, entrenado únicamente sobre proporciones de gasto, construye tres niveles usando vino (31,6 %), pescado (16,8 %), dulces (15,9 %) y carne (13,9 %) como variables más discriminantes. Solo dos combinaciones producen predicciones no mayoritarias: clientes con una proporción de vino \< 21 % y de dulces ≥ 24 % se clasifican como **jóvenes** (64 % de confianza); clientes con vino ≥ 47 %, carne \< 32 % y pescado ≥ 5,9 % se clasifican como **pre-seniors** (65 % de confianza). En el resto de casos el modelo siempre predice adulto, y el grupo senior nunca se predice porque su perfil es prácticamente idéntico al del pre-senior. La conclusión es clara: la relación entre edad y tipo de producto es estadísticamente real pero no suficientemente fuerte para segmentar grupos de edad a partir del patrón de compra.
 
 ### Implicaciones empresariales
 
 Desde una perspectiva de *Customer Analytics*, estos resultados sugieren:
 
--   **Segmentación por ciclo vital**: Los clientes **seniors** (>65) tienen el mayor gasto medio por cliente (954 €), aunque son un segmento pequeño (n = 76). Los **pre-seniors** (51–65), con mayor masa de clientes y gasto medio en torno a los 689 €, representan el mayor volumen de facturación agregada. Ambos segmentos deben ser prioritarios, con énfasis en productos *premium* (vino de calidad, carne), canales cómodos y programas de fidelización.
+-   **Segmentación por ciclo vital**: Los clientes **seniors** (\>65) tienen el mayor gasto medio por cliente (954 €), aunque son un segmento pequeño (n = 76). Los **pre-seniors** (51–65), con mayor masa de clientes y gasto medio en torno a los 689 €, representan el mayor volumen de facturación agregada. Ambos segmentos deben ser prioritarios, con énfasis en productos *premium* (vino de calidad, carne), canales cómodos y programas de fidelización.
 -   **Activación de jóvenes**: Los clientes jóvenes (≤35) gastan menos en valor absoluto, pero el árbol revela que se caracterizan por alta proporción de dulces y baja de vino. Estrategias de introducción progresiva a categorías de mayor ticket (por ejemplo, wine discovery programs) pueden aprovechar esta trayectoria natural de consumo.
 -   **Personalización por categoría y perfil de compra**: Dado que el mix de producto (no solo el gasto total) varía con la edad, las recomendaciones y comunicaciones deberían adaptarse al perfil de proporciones: vino y carne para pre-seniors y seniors, categorías más accesibles (fruta, dulces) para jóvenes.
 -   **No sobreestimar la edad como palanca de segmentación**: La relación edad–producto existe pero es débil. El vino discrimina entre grupos de edad más por su función en el ciclo vital (su proporción baja en adultos con hijos y sube en pre-seniors) que por la edad per se. Combinar la edad con variables de estructura familiar e ingresos producirá segmentaciones mucho más precisas.
+
+## Referencias
+
+Parment, A. (2013). "Generation Y vs. Baby Boomers: Shopping behavior, buyer involvement and implications for retailing". *Journal of Retailing and Consumer Services*, 20(2), 189-199. Recuperado de: <https://doi.org/10.1016/j.jretconser.2012.12.001>
+
+Moschis, G. P. (2019). "Consumer behavior in later life: Current knowledge, issues, and new directions for research". *Psychology & Marketing*, 36(1), 5-18. Recuperado de: <https://doi.org/10.1002/mar.21154>
+
+
+Thach, L., & Olsen, J. E. (2015). "Profiling the premium wine drinker in the market". *Wine Economics and Policy*, 4(1), 30-37. Recuperado de: <https://doi.org/10.1016/j.wep.2015.04.001>
+
+
