@@ -529,8 +529,6 @@ print(resultados_cor)
 **Hallazgo clave — Análisis 4:** Las correlaciones de Spearman son negativas y significativas para todas las combinaciones de variables familiares (Kidhome, Teenhome) con el gasto. Las asociaciones más fuertes (ρ más negativo) se dan con el **vino y el gasto total**, mientras que las correlaciones con fruta y dulces son más débiles. Tener adolescentes en casa penaliza el gasto de forma comparable a tener niños pequeños, lo que indica que **el efecto no se diluye con la edad de los hijos.**
 :::
 
-Las correlaciones de Spearman son negativas y significativas para todas las combinaciones de variables familiares (Kidhome, Teenhome) con el gasto. Las asociaciones más fuertes (ρ más negativo) se dan con el vino y el gasto total, mientras que las correlaciones con fruta y dulces son más débiles. Tener adolescentes en casa penaliza el gasto de forma comparable a tener niños pequeños, lo que indica que el efecto no se diluye con la edad de los hijos.
-
 ## Análisis 5: Estado civil y patrón de consumo
 
 ### 5.1. Gasto total por estado civil
