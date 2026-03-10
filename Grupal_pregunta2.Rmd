@@ -834,7 +834,7 @@ fviz_cluster(kmeans_model,
 
 ::: insight-box
 **Nota Técnica — Dimensionalidad y Agrupamiento (WSS y PCA):**
-El algoritmo partió del método del codo minimizando la varianza intra-clúster (WSS), sugiriendo empíricamente que *k=4* lograba estabilizar la cohesión frente a la pérdida de información. Como el modelo se apoya en 4 dimensiones matemáticas distintas, el gráfico superior aplica un *Análisis de Componentes Principales (PCA)* para comprimirlas en 2 ejes artificiales, consiguiendo explicar un destacable \~84% de toda la información (varianza real) en un solo vistazo plano y desvelando fronteras muy sólidas entre los 4 grupos.
+El algoritmo partió del método del codo minimizando la varianza intra-clúster (WSS), sugiriendo empíricamente que *k=4* lograba estabilizar la cohesión frente a la pérdida de información. Como el modelo se apoya en 4 dimensiones matemáticas distintas, el gráfico superior aplica un *Análisis de Componentes Principales (PCA)* para comprimirlas en 2 ejes artificiales, consiguiendo explicar un destacable \~87% de toda la información (varianza real) en un solo vistazo plano y desvelando fronteras muy sólidas entre los 4 grupos.
 :::
 
 ## Conclusiones
