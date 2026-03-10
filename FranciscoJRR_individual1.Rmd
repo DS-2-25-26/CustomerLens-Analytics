@@ -941,8 +941,6 @@ Gupta, S., Hanssens, D., Hardie, B., Kahn, W., Kumar, V., Lin, N., Ravishanker, 
 
 Kumar, V., & Reinartz, W. (2016). Creating enduring customer value. *Journal of Marketing*, 80(6), 36–68. <https://doi.org/10.1509/jm.15.0414>
 
-Moe, W. W. (2003). Buying, searching, or browsing: Differentiating between online shoppers using in-store navigational clickstream. *Journal of Consumer Psychology*, 13(1–2), 29–39. <https://doi.org/10.1207/S15327663JCP13-1&2_03>
-
 R for Data Science. "Data Transformation: dplyr and data manipulation". Recuperado de: <https://r4ds.hadley.nz/data-transform>
 
 UC Business Analytics. "Regression Trees and Recursive Partitioning in R". Recuperado de: <https://uc-r.github.io/regression_trees>

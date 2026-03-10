@@ -665,8 +665,6 @@ La combinación del análisis exploratorio, los datos descriptivos de la tabla y
 
 Agrawal, R., & Srikant, R. (1994). Fast algorithms for mining association rules. *Proceedings of the 20th International Conference on Very Large Data Bases (VLDB)*, 1215, 487–499.
 
-Moe, W. W. (2003). Buying, searching, or browsing: Differentiating between online shoppers using in-store navigational clickstream. *Journal of Consumer Psychology*, 13(1–2), 29–39. <https://doi.org/10.1207/S15327663JCP13-1&2_03>
-
 Blattberg, R. C., Kim, B. D., & Neslin, S. A. (2008). *Database Marketing: Analyzing and Managing Customers*. Springer. <https://doi.org/10.1007/978-0-387-72579-6>
 
 R for Data Science. "Data Transformation: dplyr and data manipulation". Recuperado de: <https://r4ds.hadley.nz/data-transform>
