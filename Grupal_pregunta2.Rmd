@@ -810,6 +810,11 @@ demografia_cluster <- data_con_clusters %>%
 demografia_cluster
 ```
 
+::: insight-box
+**Insight de Negocio — Perfiles Orgánicos:**
+El cruce de estas dos tablas destapa la demografía oculta tras los hábitos de consumo para los 4 clústeres. El **Clúster 1 ("Esforzados")** agrupa a familias jóvenes de renta ajustada que picotean en muchas categorías por necesidad (alta diversidad) pero en pocas visitas. El **Clúster 4 ("Pragmáticos")** es el grupo de renta media con más hijos a cargo (96%) y es el que explora menos categorías, yendo directamente "a tiro hecho". El **Clúster 3 ("Caprichosos Concentrados")** goza de rentas altas y compra en múltiples secciones, pero concentra el grueso de su dinero en solo uno o dos artículos premium (baja entropía). Finalmente, el **Clúster 2 ("Exploradores Premium")** representa a clientes VIP sin apenas cargas familiares (solo 43% con hijos), lo que les permite hiper-frecuentar la tienda (19 compras) gastando el dinero fuerte equitativamente en toda la variedad del catálogo.
+:::
+
 ### 7.4. Visualización de los clusters
 
 Podemos proyectar los clusters en un espacio bidimensional (PCA) para ver la separación de los grupos.
@@ -828,8 +833,8 @@ fviz_cluster(kmeans_model,
 ```
 
 ::: insight-box
-**Hallazgo clave — Análisis 7:** Tanto la bifurcación inicial del árbol como el score de importancia relativa coronan al nivel económico (`Income`) como el motor indiscutible de la diversificación.
-Tras su estela, la presencia de menores en el hogar constriñe fuertemente el abanico de categorías adquiridas, castigando la exploración a favor de consumos obligatorios, frente a un perfil sin hijos con más margen para el capricho.
+**Nota Técnica — Dimensionalidad y Agrupamiento (WSS y PCA):**
+El algoritmo partió del método del codo minimizando la varianza intra-clúster (WSS), sugiriendo empíricamente que *k=4* lograba estabilizar la cohesión frente a la pérdida de información. Como el modelo se apoya en 4 dimensiones matemáticas distintas, el gráfico superior aplica un *Análisis de Componentes Principales (PCA)* para comprimirlas en 2 ejes artificiales, consiguiendo explicar un destacable \~84% de toda la información (varianza real) en un solo vistazo plano y desvelando fronteras muy sólidas entre los 4 grupos.
 :::
 
 ## Conclusiones
@@ -853,8 +858,7 @@ En contraste, los clientes de menor renta tienden a concentrar su gasto en una o
 **5. El número total de compras también crece con los ingresos.** La correlación entre ingresos y `Total_Purchases` es positiva y significativa.
 Los clientes de mayor poder adquisitivo no solo diversifican más, sino que también compran con mayor frecuencia, lo que amplifica su valor como clientes.
 
-**6. (Pregunta extra) Los ingresos son el factor más determinante de la diversidad.** El árbol de decisión confirma que `Income` es la variable de mayor importancia para predecir cuántas categorías compra un cliente, por encima de la edad, la estructura familiar o el nivel educativo.
-La estructura del árbol revela perfiles accionables: los clientes con ingresos por debajo de cierto umbral y con hijos presentan la menor diversidad, mientras que los de ingresos altos diversifican independientemente de otras variables.
+**6. (Pregunta extra) Existen perfiles multidimensionales claros de diversificación.** El análisis de clustering (K-Means) agrupa orgánicamente a los clientes en 4 nichos definidos basándose en su nivel de ingresos, complejidad de cesta y demografía subyacente. Se identifican clústeres rentables de rentas altas y sin hijos ("Exploradores Premium") que maximizan diversidad e interacción, frente a grupos más jóvenes y con familias a cargo que, a la fuerza, deben consumir amplias categorías priorizando básicos, pero rindiendo un escaso nivel de rentabilidad por sus bajas frecuencias de compra.
 
 ### Implicaciones empresariales tácticas.
 
