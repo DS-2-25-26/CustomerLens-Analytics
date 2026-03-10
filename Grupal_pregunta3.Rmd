@@ -348,7 +348,7 @@ resultados_kruskal
 ```
 
 ::: insight-box
-**Hallazgo clave — Análisis 2:** La edad redistribuye el presupuesto hacia lo premium. Mientras que categorías como dulces o pescado varían poco (en términos absolutos), el Vino experimenta un aumento espectacular con los años. De manera curiosa, la Carne arranca fuerte en la juventud, cae en la adultez temprana (donde dominan los mayores gastos familiares o la hipoteca) y reflorece al acercarse a la jubilación.
+**Hallazgo clave — Análisis 2:** La edad redistribuye el presupuesto hacia lo premium. Mientras que categorías como dulces o pescado varían poco (en términos absolutos), el vino experimenta un aumento espectacular con los años. De manera curiosa, la carne arranca fuerte en la juventud, cae en la adultez temprana (donde dominan los mayores gastos familiares o la hipoteca) y reflorece al acercarse a la jubilación.
 :::
 
 ## Análisis 3: Curva de evolución del gasto con la edad
