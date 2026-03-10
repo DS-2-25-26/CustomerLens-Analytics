@@ -106,7 +106,7 @@ A partir de esta pregunta principal se derivan las siguientes subpreguntas:
 -   ¿Qué categorías de producto se «activan» primero y cuáles requieren mayor poder adquisitivo?
 -   ¿Cómo se distribuye el gasto *dentro* de la cesta según el nivel de ingresos? (concentración vs. homogeneidad)
 -   ¿El número total de compras también crece con los ingresos, o solo la variedad?
--   **Pregunta extra**: ¿Qué variables socioeconómicas predicen mejor la diversidad de la cesta?
+-   **Pregunta extra**: ¿Existen segmentos orgánicos de clientes según su comportamiento de diversificación?
 
 ## Carga de librerías y datos
 
@@ -265,10 +265,14 @@ diversity_dist <- data %>%
     mutate(prop = n / sum(n)) %>%
     ungroup()
 
-p_div_dist <- ggplot(diversity_dist, aes(x = factor(Product_Diversity), y = prop, fill = Income_Group,
-                                         text = paste0("Ingresos: ", Income_Group,
-                                                       "<br>Diversidad: ", Product_Diversity,
-                                                       "<br>Proporción: ", percent(prop, accuracy = 0.1)))) +
+p_div_dist <- ggplot(diversity_dist, aes(
+    x = factor(Product_Diversity), y = prop, fill = Income_Group,
+    text = paste0(
+        "Ingresos: ", Income_Group,
+        "<br>Diversidad: ", Product_Diversity,
+        "<br>Proporción: ", percent(prop, accuracy = 0.1)
+    )
+)) +
     geom_col(position = position_dodge(width = 0.8), width = 0.7, alpha = 0.9) +
     scale_fill_manual(values = palette_income) +
     scale_y_continuous(labels = percent_format()) +
@@ -284,7 +288,7 @@ p_div_dist <- ggplot(diversity_dist, aes(x = factor(Product_Diversity), y = prop
         legend.position = "top"
     )
 
-ggplotly(p_div_dist, tooltip = "text") %>% 
+ggplotly(p_div_dist, tooltip = "text") %>%
     layout(margin = list(t = 80, b = 80, l = 80, r = 80))
 ```
 
@@ -365,9 +369,13 @@ div_decil <- data %>%
         .groups = "drop"
     )
 
-p_div_decil <- ggplot(div_decil, aes(x = Income_Decile, y = diversidad_media,
-                                     text = paste0("Decil: ", Income_Decile,
-                                                   "<br>Diversidad media: ", round(diversidad_media, 1)))) +
+p_div_decil <- ggplot(div_decil, aes(
+    x = Income_Decile, y = diversidad_media,
+    text = paste0(
+        "Decil: ", Income_Decile,
+        "<br>Diversidad media: ", round(diversidad_media, 1)
+    )
+)) +
     geom_line(color = "#1B4965", linewidth = 1.2) +
     geom_point(aes(size = n), color = "#1B4965", alpha = 0.8) +
     geom_text(aes(label = round(diversidad_media, 1)),
@@ -385,7 +393,7 @@ p_div_decil <- ggplot(div_decil, aes(x = Income_Decile, y = diversidad_media,
     theme_minimal(base_size = 13) +
     theme(plot.title = element_text(face = "bold"))
 
-ggplotly(p_div_decil, tooltip = "text") %>% 
+ggplotly(p_div_decil, tooltip = "text") %>%
     layout(margin = list(t = 80, b = 80, l = 80, r = 80))
 ```
 
@@ -421,10 +429,14 @@ activacion <- data %>%
     ) %>%
     pivot_longer(-Income_Decile, names_to = "Categoria", values_to = "Tasa_Activacion")
 
-p_act <- ggplot(activacion, aes(x = Income_Decile, y = Tasa_Activacion, color = Categoria,
-                                text = paste0("Categoría: ", Categoria,
-                                              "<br>Decil: ", Income_Decile,
-                                              "<br>Activación: ", percent(Tasa_Activacion, accuracy = 0.1)))) +
+p_act <- ggplot(activacion, aes(
+    x = Income_Decile, y = Tasa_Activacion, color = Categoria,
+    text = paste0(
+        "Categoría: ", Categoria,
+        "<br>Decil: ", Income_Decile,
+        "<br>Activación: ", percent(Tasa_Activacion, accuracy = 0.1)
+    )
+)) +
     geom_line(linewidth = 1.1) +
     geom_point(size = 2.5) +
     scale_color_manual(values = palette_products) +
@@ -443,7 +455,7 @@ p_act <- ggplot(activacion, aes(x = Income_Decile, y = Tasa_Activacion, color = 
         legend.position = "right"
     )
 
-ggplotly(p_act, tooltip = "text") %>% 
+ggplotly(p_act, tooltip = "text") %>%
     layout(margin = list(t = 80, b = 80, l = 80, r = 80))
 ```
 
@@ -685,16 +697,20 @@ tabla_cor
 limit_inf <- min(tabla_cor$rho) * 1.3
 limit_sup <- max(tabla_cor$rho) * 1.3
 
-p_cor <- ggplot(tabla_cor, aes(x = reorder(Metrica, abs(rho)), y = rho,
-                                 text = paste0("Métrica: ", Metrica,
-                                               "<br>Spearman (ρ): ", rho))) +
+p_cor <- ggplot(tabla_cor, aes(
+    x = reorder(Metrica, abs(rho)), y = rho,
+    text = paste0(
+        "Métrica: ", Metrica,
+        "<br>Spearman (ρ): ", rho
+    )
+)) +
     geom_col(fill = "#1B4965", alpha = 0.9, width = 0.5) +
     geom_text(aes(label = paste0("ρ = ", rho)),
-        hjust = ifelse(tabla_cor$rho >= 0, -0.2, 1.2), 
+        hjust = ifelse(tabla_cor$rho >= 0, -0.2, 1.2),
         size = 4, fontface = "bold"
     ) +
     coord_flip() +
-    scale_y_continuous(limits = c(limit_inf, limit_sup)) + 
+    scale_y_continuous(limits = c(limit_inf, limit_sup)) +
     labs(
         title = "Correlación de Spearman: Ingresos vs. métricas",
         subtitle = "Asociación entre ingresos y métricas de consumo",
@@ -703,7 +719,7 @@ p_cor <- ggplot(tabla_cor, aes(x = reorder(Metrica, abs(rho)), y = rho,
     theme_minimal(base_size = 13) +
     theme(plot.title = element_text(face = "bold"))
 
-ggplotly(p_cor, tooltip = "text") %>% 
+ggplotly(p_cor, tooltip = "text") %>%
     layout(margin = list(t = 80, b = 80, l = 80, r = 80))
 ```
 
@@ -712,84 +728,103 @@ ggplotly(p_cor, tooltip = "text") %>%
 Sin embargo, la relación con la estructura de la cesta es más compleja: aunque tocan un número ligeramente mayor de categorías ($\rho = 0.21$), la **Entropía de Shannon negativa** ($\rho = -0.23$) sugiere que estos clientes Premium tienden a especializar su gasto, concentrándose en nichos específicos de alto valor en lugar de dispersar su presupuesto de forma aleatoria.
 :::
 
-## Análisis 7 (Pregunta extra): ¿Qué predice la diversidad de la cesta?
+## Análisis 7 (Pregunta extra): ¿Existen perfiles de clientes según su diversidad de compra? (Clustering)
 
-Para determinar qué factores socioeconómicos tienen mayor peso en la diversificación del gasto, construimos un **árbol de decisión** que predice `Product_Diversity` a partir de variables de perfil.
-A diferencia de otros modelos del proyecto que predicen gasto total o segmento de gasto, este modelo se centra específicamente en la **amplitud de la cesta**.
+En lugar de predecir la diversidad, podemos utilizar técnicas de aprendizaje no supervisado para encontrar **grupos naturales (clusters)** de clientes basados en su comportamiento de diversificación y su nivel de ingresos.
+Para ello, aplicaremos el algoritmo **K-Means** sobre las principales variables de interés: `Product_Diversity`, `Shannon_Entropy`, `Total_Purchases` e `Income`. Antes de aplicar el algoritmo, es fundamental escalar las variables para que todas tengan el mismo peso en el cálculo de distancias.
 
-### 7.1. Entrenamiento del modelo
+### 7.1. Preparación de datos y escalado
 
-```{r}
-data_modelo <- data %>%
-    mutate(Children_Home_num = as.numeric(Children_Home)) %>%
-    select(Product_Diversity, Income, Age, Children_Home_num, Education, Marital_Status)
+```{r message=FALSE, warning=FALSE}
+library(cluster)
+library(factoextra)
 
-set.seed(42)
-tree_model <- rpart(Product_Diversity ~ .,
-    data = data_modelo,
-    control = rpart.control(cp = 0.01, maxdepth = 4, minsplit = 50)
-)
+# Seleccionamos las variables numéricas clave de diversidad e ingresos, manteniendo el ID
+data_cluster <- data %>%
+    mutate(ID_original = row_number()) %>%
+    filter(Total_Spending > 0) %>% # Excluir casos sin gasto para entropía
+    filter(Income != 666666) %>% # Excluir outlier
+    select(ID_original, Income, Product_Diversity, Shannon_Entropy, Total_Purchases) %>%
+    drop_na()
+
+# Escalamos los datos (z-score), excluyendo el ID
+data_scaled <- scale(data_cluster %>% select(-ID_original))
 ```
 
-### 7.2. Visualización del árbol
+### 7.2. Selección del número óptimo de clusters (k)
 
-```{r fig.width=10, fig.height=6}
-rpart.plot(tree_model,
-    type = 4,
-    extra = 101,
-    fallen.leaves = TRUE,
-    shadow.col = "gray80",
-    box.palette = "BuRd",
-    main = "Árbol de decisión: predicción de la diversidad de productos\nsegún ingresos y variables socioeconómicas",
-    cex = 0.8
-)
-```
-
-**Interpretación visual del árbol:** Leído de arriba hacia la caída de hojas, este árbol entroniza de nuevo al factor monetario (`Income` \< 51e3) como el primer y gran discriminador ciego para diagnosticar si alguien comprará pocos o muchos tipos de artículo.
-Sorprendentemente, tras depurar su renta, el árbol interroga (no sobre el marketing o canal) sino sobre el número de niños en el hogar (`Children_Home_num`), castigando a las familias con bolsillos ajustados frente al idílico perfil de alto poder adquisitivo sin importar su condición social o de soltería.
-
-### 7.3. Importancia de las variables
-
-```{r}
-importancia <- tree_model$variable.importance
-importancia_df <- data.frame(
-    Variable = names(importancia),
-    Importancia = as.numeric(importancia)
-) %>%
-    arrange(desc(Importancia)) %>%
-    mutate(Importancia_Rel = Importancia / sum(Importancia) * 100)
-
-importancia_df
-```
+Utilizamos el método del codo (Elbow method) para determinar el número óptimo de grupos.
 
 ```{r fig.width=8, fig.height=4}
-ggplot(importancia_df, aes(x = reorder(Variable, Importancia_Rel), y = Importancia_Rel)) +
-    geom_col(fill = "#1B4965", alpha = 0.9, width = 0.6) +
-    geom_text(aes(label = paste0(round(Importancia_Rel, 1), "%")),
-        hjust = -0.2, size = 4
-    ) +
-    coord_flip() +
-    scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+set.seed(42)
+fviz_nbclust(data_scaled, kmeans, method = "wss", linecolor = "#1B4965") +
     labs(
-        title = "Importancia relativa de las variables en el modelo de diversidad",
-        subtitle = "Contribución de cada variable a la predicción de la diversidad de productos",
-        x = NULL, y = "Importancia relativa (%)"
+        title = "Método del Codo para determinar 'k'",
+        subtitle = "Buscamos el punto donde la reducción de varianza intra-cluster se estabiliza",
+        x = "Número de clusters (k)", y = "Suma de cuadrados intra-cluster (WSS)"
     ) +
     theme_minimal(base_size = 13) +
     theme(plot.title = element_text(face = "bold"))
 ```
 
-### 7.4. Evaluación del modelo
+Observando el gráfico, k=3 o k=4 parecen opciones razonables. Optaremos por **k=4** para obtener una segmentación más rica y accionable.
+
+### 7.3. Ejecución de K-Means y perfiles de los clusters
 
 ```{r}
-predicciones <- predict(tree_model, data_modelo)
-r2 <- cor(data_modelo$Product_Diversity, predicciones)^2
-rmse <- sqrt(mean((data_modelo$Product_Diversity - predicciones)^2))
+set.seed(42)
+kmeans_model <- kmeans(data_scaled, centers = 4, nstart = 25)
 
-cat("R² del modelo:", round(r2, 4), "\n")
-cat("RMSE:", round(rmse, 2), "categorías\n")
-cat("Diversidad media real:", round(mean(data_modelo$Product_Diversity), 2), "categorías\n")
-cat("Error relativo (RMSE / media):", round(rmse / mean(data_modelo$Product_Diversity) * 100, 1), "%\n")
+# Añadimos la asignación de cluster a los datos de trabajo
+data_cluster$Cluster <- as.factor(kmeans_model$cluster)
+
+# Unimos los clusters con el dataset original usando el ID único para evitar duplicados
+data_con_clusters <- data_cluster %>%
+    left_join(
+        data %>% mutate(ID_original = row_number()) %>% select(ID_original, Age, Children_Home),
+        by = "ID_original"
+    )
+
+# 1. Perfil basado en las variables del clustering
+perfiles_cluster <- data_con_clusters %>%
+    group_by(Cluster) %>%
+    summarise(
+        Tamaño = n(),
+        Ingreso_Medio = mean(Income),
+        Diversidad_Media = mean(Product_Diversity),
+        Entropia_Media = mean(Shannon_Entropy),
+        Compras_Medias = mean(Total_Purchases)
+    ) %>%
+    arrange(Ingreso_Medio)
+
+perfiles_cluster
+
+# 2. Perfil demográfico (variables que NO entraron en el K-Means)
+demografia_cluster <- data_con_clusters %>%
+    group_by(Cluster) %>%
+    summarise(
+        Edad_Media = round(mean(Age), 1),
+        Pct_Con_Hijos = round(mean(Children_Home > 0) * 100, 1)
+    )
+
+demografia_cluster
+```
+
+### 7.4. Visualización de los clusters
+
+Podemos proyectar los clusters en un espacio bidimensional (PCA) para ver la separación de los grupos.
+
+```{r fig.width=10, fig.height=6}
+fviz_cluster(kmeans_model,
+    data = data_scaled,
+    geom = "point",
+    ellipse.type = "convex",
+    ggtheme = theme_minimal(base_size = 13),
+    main = "Agrupamiento de clientes (K-Means, k=4)",
+    palette = c("#E8505B", "#F4A261", "#2E86AB", "#1B4965")
+) +
+    labs(subtitle = "Proyección de clusters basada en Ingresos, Diversidad, Entropía y Compras") +
+    theme(plot.title = element_text(face = "bold"))
 ```
 
 ::: insight-box
@@ -821,13 +856,12 @@ Los clientes de mayor poder adquisitivo no solo diversifican más, sino que tamb
 **6. (Pregunta extra) Los ingresos son el factor más determinante de la diversidad.** El árbol de decisión confirma que `Income` es la variable de mayor importancia para predecir cuántas categorías compra un cliente, por encima de la edad, la estructura familiar o el nivel educativo.
 La estructura del árbol revela perfiles accionables: los clientes con ingresos por debajo de cierto umbral y con hijos presentan la menor diversidad, mientras que los de ingresos altos diversifican independientemente de otras variables.
 
-### Implicaciones empresariales tácticas y Next Steps
+### Implicaciones empresariales tácticas.
 
 Desde una perspectiva avanzada de *Customer Analytics* orientada a maximizar el Lifetime Value (CLV), proactivamos las siguientes rutas:
 
 -   **Algoritmia de Cross-selling escalonada:** No debemos disparar sugerencias aleatorias. Sabiendo la jerarquía (vino-\>carne-\>...-\>oro), los motores de recomendación deben empujar a los clientes que acaban de cruzar la frontera Q2, la próxima categoría biológicamente esperada, elevando su ticket sin causar fricción intrusiva.
 -   **Ahorro de Incentivos (Punto de Saturación):** El hallazgo técnico bandera de la saturación en el decil 7 revela ineficiencias de marketing. Entregar cupones multidimensionales a las clases altas roza el despilfarro: ya nos compran todo el catálogo. Su *engagement* transcurrirá mediante fidelización y experiencias, no mediante descuentos transversales de ampliación.
--   **NEXT STEP - Clustering Jerárquico por Cestas:** Sugerimos al equipo transitar en la próxima iteración del proyecto a ensamblar modelos no supervisados (*K-Means* o algoritmos genéticos). En lugar de empujar mediante reglas fijas, modelar una agrupación por "cestas espejo" cimentada sobre `Shannon_Entropy` nos entregará sub-poblaciones prediseñadas para abatir stock remanente hiper-específico (la llamada *"long-tail"*).
 
 ## Referencias
 
